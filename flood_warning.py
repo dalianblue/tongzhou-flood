@@ -212,6 +212,22 @@ def cmd_demo(date: str):
     lv = sig.apply(assess, axis=1)
     view = sig[cols].iloc[::3].round(2)
     view["预警"] = [d["level"] for d in lv[::3]]
+    # 台风距岛列 (来自 typhoon.py --harvest 的轨迹缓存)
+    try:
+        import typhoon as TYPH
+        tr = [r for r in TYPH.load_tracks()
+              if abs((pd.Timestamp(r["ts"]) - d).total_seconds()) < 3 * 86400]
+        if tr:
+            tdf = pd.DataFrame({"ts": pd.to_datetime([r["ts"] for r in tr]),
+                                "d": [float(r["dist_km"]) for r in tr],
+                                "v": [f"{r['name']}{float(r['dist_km']):.0f}km"
+                                      for r in tr]}).sort_values("d")
+            tdf = tdf.drop_duplicates("ts", keep="first")       # 每时刻取距岛最近的台风
+            tdf = tdf.set_index("ts").sort_index()
+            tdf.index = tdf.index.tz_localize("Asia/Shanghai")  # 对齐 view.index (+08:00)
+            view["台风"] = tdf.reindex(view.index, method="ffill")["v"].fillna("")
+    except Exception:
+        pass
     print(view.loc[str(d.date()):].to_string())
     print("\n图例: 阈值 黄-泄洪 坝下24≥7.0&渌渚涨≥0.3 | 黄-支流 渌渚涨≥0.8/渌渚镇≥1.2/山溪≥0.6 | "
           f"红 动量≥{TH_MOM_R} 或 坝下24≥8.6 或 坝下≥10 或 黄+闸口≥6.0")
@@ -279,6 +295,25 @@ def cmd_check():
         print(f"  - {x}")
     if r["level"] == "绿":
         print(f"  (各站低于黄警阈值; 淹没阈值 新桐乡 黄{TH_FLOOD_Y}m/红{TH_FLOOD_R}m)")
+    # 台风因素 (预备级, 独立于水位等级): 72h预报路径距岛≤500km → 水库大概率预泄
+    try:
+        import typhoon as TYPH
+        th = TYPH.live_threat()
+        print("\n台风因素 (预备级):")
+        if not th["typhoons"]:
+            print("  当前无活动台风")
+        for t in th["typhoons"]:
+            if "error" in t:
+                print(f"  {t['name']}: 拉取失败 {t['error']}")
+            else:
+                line = f"  {t['name']}({t['num']}) {t['grade']} 距岛{t['cur_km']}km"
+                if t["fc_min_km"] is not None:
+                    line += f", 72h预报最近{t['fc_min_km']}km({t['fc_at']})"
+                print(line)
+        if th["prealert"]:
+            print("  ★ 预备级(蓝)触发: 台风将影响 → 预期水库预泄(坝下将抬升) + 支流涨水, 提前巡查准备")
+    except Exception as e:
+        print(f"\n台风因素: 拉取失败({repr(e)[:50]}), 跳过")
     return 0
 
 
