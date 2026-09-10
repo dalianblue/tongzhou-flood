@@ -5,13 +5,14 @@
 8/9 新桐乡 11.31m 读数为洪水期传感器故障(同时刻上游坝下仅7.5m, 物理不可能),
 真实峰值约 7.1m; 7月真实峰值 7.61m. 淹没阈值: 新桐乡(7011AJ4M) ≥6.5m 黄 / ≥7.0m 红.
 
-规则集 (2026-01~08 归档逐时校准, 详见 architect.md A9):
-  黄-泄洪型: 坝下24h均值≥7.0 且 渌渚6h涨幅≥0.3   → 7月事件提前17h
-  黄-支流型: 渌渚6h涨≥0.8 | 渌渚镇涨≥1.2 | 山溪涨≥0.6 → 8月事件提前11h
-  红-动量:   渌渚当前+6h涨幅 ≥7.3 (峰值外推)      → 7月提前9h
+规则集 (2026-06~08 样本逐时校准):
+  黄-泄洪型: 坝下24h均值≥7.0 且 渌渚6h涨幅≥0.3   → 7月事件提前19h
+  黄-支流型: 渌渚6h涨≥0.8 | 渌渚镇涨≥0.5 | 山溪涨≥0.6 → 8月事件提前39h (渌渚镇缓涨早可见)
+  红-动量:   渌渚当前+6h涨幅 ≥7.3 (峰值外推)
+  红-支流动量: 渌渚镇当前+6h涨幅 ≥8.3            → 8月首红提前9h
   红-泄洪级: 坝下24h均值≥8.6 或 坝下≥10.0
   顶托:     闸口≥6.0 时黄升红
-全年回测: 黄误报67h/红误报23h(其中过半为退水期滞后与真实大泄洪日, 详见 --backtest).
+回测(1632h): 4事件全中, 黄误报72h/红误报32h(过半为退水期滞后与真实大泄洪日, 详见 --backtest).
 
 用法:
   python flood_warning.py --check                 # 实况风险卡 (4次API, 间隔26s)
@@ -41,9 +42,10 @@ ZM_XT = "7011AJ4M"      # 新桐乡 (岛对岸锚站)
 TH_BAXIA24_Y = 7.0      # 黄-泄洪: 坝下24h均值
 TH_LZ_R6_Y = 0.3        # 黄-泄洪: 渌渚6h涨幅配合
 TH_LZ_R6_Y2 = 0.8       # 黄-支流: 渌渚6h涨幅
-TH_LZZ_R6_Y = 1.2       # 黄-支流: 渌渚镇6h涨幅
+TH_LZZ_R6_Y = 0.5       # 黄-支流: 渌渚镇6h涨幅 (原1.2; 支流缓涨型39h前即可见, 8月型首黄15h→39h)
 TH_XI_R6_Y = 0.6        # 黄-支流: 山溪6h涨幅
 TH_MOM_R = 7.3          # 红-动量: 渌渚+6h涨幅 外推峰值
+TH_LZZ_MOM_R = 8.3      # 红-支流动量: 渌渚镇+6h涨幅 外推峰值 (支流型首红5h→9h)
 TH_BAXIA24_R = 8.6      # 红-泄洪级: 坝下24h均值
 TH_BAXIA_R = 10.0       # 红-泄洪级: 坝下瞬时
 TH_ZK_HOLD = 6.0        # 顶托: 闸口潮位
@@ -96,6 +98,7 @@ def signals(h: pd.DataFrame) -> pd.DataFrame:
         "baxia_r6": h["baxia"] - h["baxia"].shift(6),
         "lz": h["luzhu"],
         "lz_r6": h["luzhu"] - h["luzhu"].shift(6),
+        "lzz": h["lzz"] if "lzz" in h else np.nan,
         "lzz_r6": h["lzz"] - h["lzz"].shift(6) if "lzz" in h else np.nan,
         "xi_r6": pd.concat([h[c] - h[c].shift(6) for c in xi_cols], axis=1).max(axis=1)
                  if xi_cols else np.nan,
@@ -136,6 +139,11 @@ def assess(sig: pd.Series) -> dict:
     if not np.isnan(mom) and mom >= TH_MOM_R:
         red = True
         reasons.append(f"动量外推峰值 {mom:.2f}≥{TH_MOM_R} (渌渚{sig.lz:.2f}+6h涨{sig.lz_r6:+.2f})")
+    mom_lzz = sig.lzz + max(0.0, sig.lzz_r6) if not np.isnan(sig.lzz) else np.nan
+    if not np.isnan(mom_lzz) and mom_lzz >= TH_LZZ_MOM_R:
+        red = True
+        reasons.append(f"支流动量外推峰值 {mom_lzz:.2f}≥{TH_LZZ_MOM_R} "
+                       f"(渌渚镇{sig.lzz:.2f}+6h涨{sig.lzz_r6:+.2f})")
     if not np.isnan(sig.baxia24) and (sig.baxia24 >= TH_BAXIA24_R or sig.baxia >= TH_BAXIA_R):
         red = True
         reasons.append(f"泄洪级: 坝下24h均值{sig.baxia24:.2f}/瞬时{sig.baxia:.2f}")
@@ -229,8 +237,8 @@ def cmd_demo(date: str):
     except Exception:
         pass
     print(view.loc[str(d.date()):].to_string())
-    print("\n图例: 阈值 黄-泄洪 坝下24≥7.0&渌渚涨≥0.3 | 黄-支流 渌渚涨≥0.8/渌渚镇≥1.2/山溪≥0.6 | "
-          f"红 动量≥{TH_MOM_R} 或 坝下24≥8.6 或 坝下≥10 或 黄+闸口≥6.0")
+    print("\n图例: 阈值 黄-泄洪 坝下24≥7.0&渌渚涨≥0.3 | 黄-支流 渌渚涨≥0.8/渌渚镇≥0.5/山溪≥0.6 | "
+          f"红 动量≥{TH_MOM_R} 或 渌渚镇动量≥{TH_LZZ_MOM_R} 或 坝下24≥8.6 或 坝下≥10 或 黄+闸口≥6.0")
 
 
 def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90,
