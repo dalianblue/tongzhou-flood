@@ -258,28 +258,43 @@ def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90) -> pd.Serie
     return s
 
 
-def cmd_check():
-    """实况: 4次API (坝下26h/渌渚7h/渌渚镇7h/闸口2h), 间隔26s, ≤3次/分纪律."""
-    plan = [(ZM_BAXIA, 2, 26.0, "坝下"), (ZM_LUZHU, 2, 7.5, "渌渚"),
-            (ZM_LZZ, 2, 7.5, "渌渚镇"), (ZM_ZHANKOU, 2, 2.0, "闸口")]
+def live_snapshot(hours: float = 72.0) -> dict:
+    """实况快照: 4次API (坝下/渌渚/渌渚镇/闸口, 各hours窗口), 间隔26s限频.
+    返回 {time, series(逐时清洗后, tz-naive北京时间字符串), sig, assess}."""
+    plan = [(ZM_BAXIA, "baxia"), (ZM_LUZHU, "luzhu"),
+            (ZM_LZZ, "lzz"), (ZM_ZHANKOU, "zk")]
     got = {}
-    for i, (zm, jg, hours, name) in enumerate(plan):
-        s = _fetch_window(zm, jg, hours)
+    for i, (zm, col) in enumerate(plan):
+        s = _fetch_window(zm, 2, hours)
         if len(s):
-            got[name] = s
+            got[col] = s
         if i < len(plan) - 1:
             time.sleep(26)  # 限频纪律
     if not got:
-        print("API 拉取全部失败")
-        return 1
+        raise RuntimeError("API 拉取全部失败")
     df = pd.DataFrame({k: clean(v) for k, v in got.items()})
     h = df.resample("h").median()
-    h = h.rename(columns={"坝下": "baxia", "渌渚": "luzhu", "渌渚镇": "lzz", "闸口": "zk"})
     if "lzz" not in h:
         h["lzz"] = np.nan
-    sig = signals(h).iloc[-1]
-    r = assess(sig)
-    now = h.index.max()
+    series = {c: [[t.strftime("%Y-%m-%dT%H:%M"), None if np.isnan(v) else round(v, 3)]
+                  for t, v in h[c].items()] for c in h.columns}
+    sg = signals(h)
+    series["baxia24"] = [[t.strftime("%Y-%m-%dT%H:%M"), None if np.isnan(v) else round(v, 3)]
+                         for t, v in sg["baxia24"].items()]
+    sig = sg.iloc[-1]
+    return {"time": h.index.max().strftime("%Y-%m-%d %H:%M"),
+            "series": series, "sig": sig, "assess": assess(sig)}
+
+
+def cmd_check():
+    """实况风险卡: live_snapshot (4次API, ~2分钟限频) + 台风预备级."""
+    try:
+        snap = live_snapshot()
+    except RuntimeError as e:
+        print(e)
+        return 1
+    sig, r = snap["sig"], snap["assess"]
+    now = snap["time"]
     print(f"=== 桐洲岛洪水风险卡 @ {now:%Y-%m-%d %H:%M} ===")
     print(f"坝下 {sig.baxia:.2f}m (24h均值{sig.baxia24:.2f}) | 渌渚 {sig.lz:.2f}m (6h{sig.lz_r6:+.2f}) | "
           f"渌渚镇6h{sig.lzz_r6:+.2f} | 闸口 {sig.zk:.2f}m")

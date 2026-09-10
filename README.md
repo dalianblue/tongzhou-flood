@@ -44,10 +44,16 @@ python3 typhoon.py --live      # 当前活动台风 + 72h预报路径距岛威�
 ## 使用
 
 ```bash
-python3 flood_warning.py --check             # 实况风险卡 (4次API, ~2分钟, 间隔26s限频)
-python3 flood_warning.py --backtest          # 历史样本回测 (零API)
+python3 dashboard.py                  # 网页监控台 (推荐): 风险卡+72h水位曲线+台风+事件复盘
+python3 flood_warning.py --check      # 实况风险卡 (4次API, ~2分钟, 间隔26s限频)
+python3 flood_warning.py --backtest   # 历史样本回测 (零API)
 python3 flood_warning.py --demo 2026-08-09   # 事件复盘 (零API)
 ```
+
+Dashboard 启动后打开 http://localhost:8787 。后台每小时自动拉取一次实况并缓存
+（`data/live_cache.json`，重启不丢），打开网页即时显示最近结果；拉取失败时保留
+上次缓存并标红提示。首次启动无缓存时第一次拉取约需 2 分钟（接口限频），页面会
+显示进度。事件复盘图表用历史样本（零 API）。
 
 ## 预警规则与回测效果
 
