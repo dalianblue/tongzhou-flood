@@ -233,21 +233,31 @@ def cmd_demo(date: str):
           f"红 动量≥{TH_MOM_R} 或 坝下24≥8.6 或 坝下≥10 或 黄+闸口≥6.0")
 
 
-def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90) -> pd.Series:
-    """浙江水利厅 getHisData 窗口拉取 (自 pyTides realtime_predictor 精简, 含超时)."""
+def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90,
+                  st=None, et=None) -> pd.Series:
+    """浙江水利厅 getHisData 窗口拉取 (自 pyTides realtime_predictor 精简, 含超时).
+    默认 et=now 往前 hours; 也可直接给 st/et (datetime, 无tz北京时间)."""
     import json
     import ssl
     import urllib.request
     from datetime import datetime, timedelta
-    et = datetime.now()  # 无tz, 北京时间
-    st = et - timedelta(hours=hours)
+    if et is None:
+        et = datetime.now()
+    if st is None:
+        st = et - timedelta(hours=hours)
     url = (f"https://sqfb.slt.zj.gov.cn/rest/water/getHisData?zm={zm}"
            f"&st={st:%Y-%m-%dT%H:%M:%S}&et={et:%Y-%m-%dT%H:%M:%S}&jg={jg}&lx=0")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout,
-                                context=ssl.create_default_context()) as r:
-        d = json.loads(r.read().decode("utf-8"))
-    rows = d.get("pz") or []
+    d = None
+    for _ in range(3):  # 502/504 偶发, 重试
+        try:
+            with urllib.request.urlopen(req, timeout=timeout,
+                                        context=ssl.create_default_context()) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            break
+        except Exception:
+            time.sleep(8)
+    rows = (d or {}).get("pz") or []
     if not rows:
         return pd.Series(dtype=float)
     df = pd.DataFrame(rows)
@@ -332,17 +342,52 @@ def cmd_check():
     return 0
 
 
+def cmd_fill_gaps():
+    """补样本缺日: 采集端每周停一天 (每周同一天仅整点12条), 用 API 按站×日回补.
+    12站×缺日 次调用, 间隔26s限频, 502/504 自动重试; 只补缺, 不覆盖已有行."""
+    from datetime import datetime as dt
+    df = pd.read_csv(ARCHIVE_CSV, low_memory=False)
+    df["ts"] = pd.to_datetime(df.sample_ts)
+    days = df.groupby(df.ts.dt.date).size()
+    gap_days = sorted(d for d, n in days.items() if n < 100)
+    if not gap_days:
+        print("无缺日, 无需补数")
+        return 0
+    print(f"缺日 {len(gap_days)} 天: {', '.join(str(d) for d in gap_days)}")
+    meta_cols = [c for c in df.columns if c not in ("sample_ts", "sbsj", "ts", "sw")]
+    meta = df.groupby("zh")[meta_cols].first()
+    zh_list = sorted(df.zh.unique())
+    calls = [(zh, d) for zh in zh_list for d in gap_days]
+    new_rows = []
+    for i, (zh, d) in enumerate(calls):
+        s = _fetch_window(zh, 2, 0, st=dt(d.year, d.month, d.day), et=dt(d.year, d.month, d.day, 23, 59))
+        for ts, sw in s.items():
+            row = dict(meta.loc[zh])
+            row.update(sample_ts=ts.isoformat(), sbsj=ts.strftime("%Y-%m-%dT%H:%M:%S"), sw=sw)
+            new_rows.append(row)
+        print(f"[{i+1}/{len(calls)}] {zh} {d}: +{len(s)} 行", flush=True)
+        if i < len(calls) - 1:
+            time.sleep(26)
+    out = pd.concat([df.drop(columns=["ts"]), pd.DataFrame(new_rows, columns=df.columns[:-1])])
+    out = out.drop_duplicates(subset=["sample_ts", "zh"], keep="first").sort_values(["sample_ts", "zh"])
+    out.to_csv(ARCHIVE_CSV, index=False)
+    print(f"补 {len(new_rows)} 行 → {ARCHIVE_CSV} (现共 {len(out)} 行)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--check", action="store_true", help="实况风险卡 (4次API)")
     ap.add_argument("--backtest", action="store_true", help="归档回测 (零API)")
     ap.add_argument("--start"); ap.add_argument("--end")
     ap.add_argument("--demo", metavar="YYYY-MM-DD", help="单事件复盘 (零API)")
+    ap.add_argument("--fill-gaps", action="store_true", help="API 回补样本缺日 (每周缺一天)")
     a = ap.parse_args()
     if a.backtest:
         sys.exit(cmd_backtest(a.start, a.end))
     if a.demo:
         cmd_demo(a.demo); return
+    if a.fill_gaps:
+        sys.exit(cmd_fill_gaps())
     if a.check:
         sys.exit(cmd_check())
     ap.print_help()
