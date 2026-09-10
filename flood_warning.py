@@ -51,6 +51,7 @@ TH_BAXIA_R = 10.0       # 红-泄洪级: 坝下瞬时
 TH_ZK_HOLD = 6.0        # 顶托: 闸口潮位
 TH_FLOOD_Y = 6.5        # 新桐乡淹没阈值-黄
 TH_FLOOD_R = 7.0        # 新桐乡淹没阈值-红
+FLOOD_SEASON = ((6, 15), (9, 10))  # 汛期窗口(月,日): 之外预测判据全停, 仅留新桐乡实测现报级
 REG_A, REG_B = 2.141, 0.468  # 日均回归 新桐乡=2.141+0.468*坝下日均 (r=0.804)
 
 STATIONS = dict(baxia=ZM_BAXIA, luzhu=ZM_LUZHU, lzz=ZM_LZZ, zk=ZM_ZHANKOU, xt=ZM_XT)  # + 溪站
@@ -108,21 +109,18 @@ def signals(h: pd.DataFrame) -> pd.DataFrame:
 
 
 def assess(sig: pd.Series) -> dict:
-    """最新信号 → {level, reasons, est_peak}. 绿/黄/红."""
+    """最新信号 → {level, reasons, est_peak}. 绿/黄/红. sig.name 需为时间戳(汛期门控用)."""
     reasons = []
     yellow = False
-    # 黄-泄洪型
-    if sig.baxia24 >= TH_BAXIA24_Y and sig.lz_r6 >= TH_LZ_R6_Y:
-        yellow = True
-        reasons.append(f"泄洪型: 坝下24h均值{sig.baxia24:.2f}≥{TH_BAXIA24_Y} 且 渌渚6h涨{sig.lz_r6:+.2f}")
-    # 黄-支流型
-    for name, v, th in [("渌渚", sig.lz_r6, TH_LZ_R6_Y2), ("渌渚镇", sig.lzz_r6, TH_LZZ_R6_Y),
-                        ("山溪", sig.xi_r6, TH_XI_R6_Y)]:
-        if not np.isnan(v) and v >= th:
-            yellow = True
-            reasons.append(f"支流型: {name}6h涨{v:+.2f}≥{th}")
+    # 汛期门控: 非汛期预测判据全停 (低流量期潮汐上溯使渌渚±1m常规波动, 渌渚绝对水位与岛脱钩
+    # — 2026-09实测: 渌渚7.89时新桐乡仅5.3), 仅保留新桐乡实测现报级兜底
+    ts = getattr(sig, "name", None)
+    in_season = True
+    if hasattr(ts, "month"):
+        d = (ts.month, ts.day)
+        in_season = FLOOD_SEASON[0] <= d <= FLOOD_SEASON[1]
     red = False
-    # 现报级: 已过淹没阈值则保持 (涨幅归零不降级)
+    # 现报级: 已过淹没阈值则保持 (涨幅归零不降级); 新桐乡实测, 非汛期也生效
     if not np.isnan(sig.xt):
         if sig.xt >= TH_FLOOD_R:
             yellow = red = True
@@ -130,29 +128,45 @@ def assess(sig: pd.Series) -> dict:
         elif sig.xt >= TH_FLOOD_Y:
             yellow = True
             reasons.append(f"现报: 新桐乡{sig.xt:.2f}≥{TH_FLOOD_Y}")
-    if not np.isnan(sig.lz) and sig.lz >= 7.0:
-        yellow = True
-        if sig.lz >= 7.5:
+    if in_season:
+        # 黄-泄洪型
+        if sig.baxia24 >= TH_BAXIA24_Y and sig.lz_r6 >= TH_LZ_R6_Y:
+            yellow = True
+            reasons.append(f"泄洪型: 坝下24h均值{sig.baxia24:.2f}≥{TH_BAXIA24_Y} 且 渌渚6h涨{sig.lz_r6:+.2f}")
+        # 黄-支流型
+        for name, v, th in [("渌渚", sig.lz_r6, TH_LZ_R6_Y2), ("渌渚镇", sig.lzz_r6, TH_LZZ_R6_Y),
+                            ("山溪", sig.xi_r6, TH_XI_R6_Y)]:
+            if not np.isnan(v) and v >= th:
+                yellow = True
+                reasons.append(f"支流型: {name}6h涨{v:+.2f}≥{th}")
+        if not np.isnan(sig.lz) and sig.lz >= 7.0:
+            yellow = True
+            if sig.lz >= 7.5:
+                red = True
+            reasons.append(f"现报: 渌渚{sig.lz:.2f}" + ("≥7.5" if red else "≥7.0"))
+        mom = sig.lz + max(0.0, sig.lz_r6) if not np.isnan(sig.lz) else np.nan
+        if not np.isnan(mom) and mom >= TH_MOM_R:
             red = True
-        reasons.append(f"现报: 渌渚{sig.lz:.2f}" + ("≥7.5" if red else "≥7.0"))
-    mom = sig.lz + max(0.0, sig.lz_r6) if not np.isnan(sig.lz) else np.nan
-    if not np.isnan(mom) and mom >= TH_MOM_R:
-        red = True
-        reasons.append(f"动量外推峰值 {mom:.2f}≥{TH_MOM_R} (渌渚{sig.lz:.2f}+6h涨{sig.lz_r6:+.2f})")
-    mom_lzz = sig.lzz + max(0.0, sig.lzz_r6) if not np.isnan(sig.lzz) else np.nan
-    if not np.isnan(mom_lzz) and mom_lzz >= TH_LZZ_MOM_R:
-        red = True
-        reasons.append(f"支流动量外推峰值 {mom_lzz:.2f}≥{TH_LZZ_MOM_R} "
-                       f"(渌渚镇{sig.lzz:.2f}+6h涨{sig.lzz_r6:+.2f})")
-    if not np.isnan(sig.baxia24) and (sig.baxia24 >= TH_BAXIA24_R or sig.baxia >= TH_BAXIA_R):
-        red = True
-        reasons.append(f"泄洪级: 坝下24h均值{sig.baxia24:.2f}/瞬时{sig.baxia:.2f}")
-    if yellow and not np.isnan(sig.zk) and sig.zk >= TH_ZK_HOLD:
-        red = True
-        reasons.append(f"潮位顶托: 闸口{sig.zk:.2f}≥{TH_ZK_HOLD}, 黄升红")
+            reasons.append(f"动量外推峰值 {mom:.2f}≥{TH_MOM_R} (渌渚{sig.lz:.2f}+6h涨{sig.lz_r6:+.2f})")
+        mom_lzz = sig.lzz + max(0.0, sig.lzz_r6) if not np.isnan(sig.lzz) else np.nan
+        if not np.isnan(mom_lzz) and mom_lzz >= TH_LZZ_MOM_R:
+            red = True
+            reasons.append(f"支流动量外推峰值 {mom_lzz:.2f}≥{TH_LZZ_MOM_R} "
+                           f"(渌渚镇{sig.lzz:.2f}+6h涨{sig.lzz_r6:+.2f})")
+        if not np.isnan(sig.baxia24) and (sig.baxia24 >= TH_BAXIA24_R or sig.baxia >= TH_BAXIA_R):
+            red = True
+            reasons.append(f"泄洪级: 坝下24h均值{sig.baxia24:.2f}/瞬时{sig.baxia:.2f}")
+        if yellow and not np.isnan(sig.zk) and sig.zk >= TH_ZK_HOLD:
+            red = True
+            reasons.append(f"潮位顶托: 闸口{sig.zk:.2f}≥{TH_ZK_HOLD}, 黄升红")
+    else:
+        mom = np.nan
+        if not yellow:
+            reasons.append("非汛期(6/15~9/10外): 预测判据停用, 仅监控新桐乡实测水位")
     level = "红" if red else ("黄" if yellow else "绿")
     est_dry = REG_A + REG_B * sig.baxia24 if not np.isnan(sig.baxia24) else np.nan
-    return {"level": level, "reasons": reasons, "est_mom": mom, "est_dry": est_dry}
+    return {"level": level, "reasons": reasons, "est_mom": mom, "est_dry": est_dry,
+            "season": "汛期" if in_season else "非汛期"}
 
 
 def _events(h: pd.DataFrame) -> list:
