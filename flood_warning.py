@@ -12,7 +12,9 @@
   红-支流动量: 渌渚镇当前+6h涨幅 ≥8.3            → 8月首红提前9h
   红-泄洪级: 坝下24h均值≥8.6 或 坝下≥10.0
   顶托:     闸口≥6.0 时黄升红
-回测(1632h): 4事件全中, 黄误报72h/红误报32h(过半为退水期滞后与真实大泄洪日, 详见 --backtest).
+  复淹警戒: 近48h曾过淹且近6h水位≥5.5 → 退水期半日潮反复越阈, 勿回低洼 (任何节气生效)
+  退水确认: 持续6h<5.5 → 12h内复淹概率<11%(实测89%), 可回岛查看
+回测(1632h): 4事件全中, 6次过淹时刻(含4次退水期复淹)全部亮灯, 详见 --backtest.
 
 用法:
   python flood_warning.py --check                 # 实况风险卡 (4次API, 间隔26s)
@@ -52,6 +54,7 @@ TH_ZK_HOLD = 6.0        # 顶托: 闸口潮位
 TH_FLOOD_Y = 6.5        # 新桐乡淹没阈值-黄
 TH_FLOOD_R = 7.0        # 新桐乡淹没阈值-红
 TH_LZ_RISE_GATE = 6.5   # 涨幅判据水位配合门(处暑~白露): 渌渚需≥此值才认涨幅
+TH_RECESS_SAFE = 5.5    # 退水分界线: 近48h曾过淹时, 近6h曾≥此值=复淹警戒(勿回低洼), 持续6h低于此值=可回岛(实测89%安全)
 SEASON_START = (6, 15)  # 主汛期起点(月,日)
 CHUSHU = (8, 23)        # 处暑 (公历近似, 每年±1天): 之后90%无汛, 涨幅判据需水位配合
 BAILU = (9, 7)          # 白露 (公历近似): 之后汛情概率<5%, 仅留新桐乡实测现报级
@@ -108,6 +111,10 @@ def signals(h: pd.DataFrame) -> pd.DataFrame:
                  if xi_cols else np.nan,
         "zk": h["zk"],
         "xt": h["xt"] if "xt" in h else np.nan,
+        "xt_max48": (h["xt"].rolling(48, min_periods=1).max().shift(1)
+                     if "xt" in h else np.nan),  # 近48h是否曾过淹(复淹警戒用)
+        "xt_max6": (h["xt"].rolling(6, min_periods=1).max()
+                    if "xt" in h else np.nan),   # 近6h水位(防潮谷瞬时跌破误报安全)
     })
 
 
@@ -138,10 +145,21 @@ def assess(sig: pd.Series) -> dict:
     if not np.isnan(sig.xt):
         if sig.xt >= TH_FLOOD_R:
             yellow = red = True
-            reasons.append(f"现报: 新桐乡{sig.xt:.2f}≥{TH_FLOOD_R}")
+            reasons.append(f"现报: 新桐乡{sig.xt:.2f}≥{TH_FLOOD_R} — 岛已深淹, 立即撤离")
         elif sig.xt >= TH_FLOOD_Y:
             yellow = True
-            reasons.append(f"现报: 新桐乡{sig.xt:.2f}≥{TH_FLOOD_Y}")
+            reasons.append(f"现报: 新桐乡{sig.xt:.2f}≥{TH_FLOOD_Y} — 岛进水, 低洼处人员撤离")
+    # 退水期复淹警戒 (居民回岛安全): 涨幅判据在退水期安静, 但半日潮会把水位反复顶过阈值
+    # — 2026年6次过淹中4次是复淹, 此前进水时模型还是绿灯. 任何节气生效(基于实测)
+    xt48 = getattr(sig, "xt_max48", np.nan)
+    xt6 = getattr(sig, "xt_max6", np.nan)
+    if not np.isnan(xt48) and xt48 >= TH_FLOOD_Y:
+        if not np.isnan(xt6) and xt6 >= TH_RECESS_SAFE and not yellow and not red:
+            yellow = True
+            reasons.append(f"复淹警戒: 近48h曾过淹(峰{xt48:.2f}), 水位仍在{TH_RECESS_SAFE}~{TH_FLOOD_Y}带, "
+                           "涨潮时段可能再越阈 — 暂勿回岛低洼处")
+        elif not np.isnan(xt6) and xt6 < TH_RECESS_SAFE:
+            reasons.append(f"退水确认: 新桐乡持续6h<{TH_RECESS_SAFE}, 12h内复淹概率<11% — 可回岛查看")
     mom = np.nan
     if phase >= 1:
         # 黄-泄洪型 (坝下24h绝对水位 + 渌渚涨幅配合)
@@ -342,10 +360,10 @@ def fetch_rain(days: int = 3) -> list:
 
 
 def live_snapshot(hours: float = 72.0) -> dict:
-    """实况快照: 4次API (坝下/渌渚/渌渚镇/闸口, 各hours窗口), 间隔26s限频.
+    """实况快照: 5次API (坝下/渌渚/渌渚镇/闸口/新桐乡, 各hours窗口), 间隔26s限频.
     返回 {time, series(逐时清洗后, tz-naive北京时间字符串), sig, assess}."""
     plan = [(ZM_BAXIA, "baxia"), (ZM_LUZHU, "luzhu"),
-            (ZM_LZZ, "lzz"), (ZM_ZHANKOU, "zk")]
+            (ZM_LZZ, "lzz"), (ZM_ZHANKOU, "zk"), (ZM_XT, "xt")]
     got = {}
     for i, (zm, col) in enumerate(plan):
         s = _fetch_window(zm, 2, hours)
@@ -359,6 +377,10 @@ def live_snapshot(hours: float = 72.0) -> dict:
     h = df.resample("h").median()
     if "lzz" not in h:
         h["lzz"] = np.nan
+    # 新桐乡非物理值剔除 (同归档清洗): 与上游渌渚差>2m 置NaN
+    if "xt" in h and "luzhu" in h:
+        lz_ff = h["luzhu"].reindex(h.index, method="ffill", tolerance=pd.Timedelta("1h"))
+        h["xt"] = h["xt"].where((h["xt"] - lz_ff).abs() <= 2.0)
     series = {c: [[t.strftime("%Y-%m-%dT%H:%M"), None if np.isnan(v) else round(v, 3)]
                   for t, v in h[c].items()] for c in h.columns}
     sg = signals(h)

@@ -50,7 +50,7 @@ def _snap_to_json(snap: dict, ty: dict) -> dict:
         "est_dry": None if np.isnan(r["est_dry"]) else round(r["est_dry"], 2),
         "stations": {"baxia": _r(sig.baxia), "baxia24": _r(sig.baxia24),
                      "luzhu": _r(sig.lz), "lz_r6": _r(sig.lz_r6),
-                     "lzz_r6": _r(sig.lzz_r6), "zk": _r(sig.zk)},
+                     "lzz_r6": _r(sig.lzz_r6), "zk": _r(sig.zk), "xt": _r(sig.xt)},
         "series": snap["series"], "typhoon": ty,
     }
 
@@ -208,7 +208,7 @@ async function loadLatest(){
     [d.est_dry!=null?`干流回归峰值≈${d.est_dry}m`:'', d.est_mom!=null?`动量外推峰值≈${d.est_mom}m`:''].filter(x=>x).join(' · ');
   document.getElementById('reasons').innerHTML =
     d.reasons.length ? d.reasons.map(r=>'· '+r).join('<br>') : '<span style="color:var(--dim)">各站低于黄警阈值</span>';
-  const ST = {baxia:'坝下',baxia24:'坝下24h均值',luzhu:'渌渚',zk:'闸口'};
+  const ST = {baxia:'坝下',baxia24:'坝下24h均值',luzhu:'渌渚',xt:'新桐乡',zk:'闸口'};
   const R6 = {lz_r6:'渌渚6h',lzz_r6:'渌渚镇6h'};
   document.getElementById('stations').innerHTML =
     Object.entries(ST).map(([k,n])=>`<div class="st"><span>${n}</span><b>${d.stations[k]??'—'} m</b></div>`).join('')
