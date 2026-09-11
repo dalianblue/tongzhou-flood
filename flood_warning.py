@@ -48,6 +48,7 @@ TH_LZZ_R6_Y = 0.5       # 黄-支流: 渌渚镇6h涨幅 (原1.2; 支流缓涨型
 TH_XI_R6_Y = 0.6        # 黄-支流: 山溪6h涨幅
 TH_MOM_R = 7.3          # 红-动量: 渌渚+6h涨幅 外推峰值
 TH_LZZ_MOM_R = 8.3      # 红-支流动量: 渌渚镇+6h涨幅 外推峰值 (支流型首红5h→9h)
+TH_LZ_GATE_RED = 5.5    # 红-支流动量佐证门: 渌渚(干流)需≥此值 (2025样本外校准, 滤支流孤涨误撤)
 TH_BAXIA24_R = 8.6      # 红-泄洪级: 坝下24h均值
 TH_BAXIA_R = 10.0       # 红-泄洪级: 坝下瞬时
 TH_ZK_HOLD = 6.0        # 顶托: 闸口潮位
@@ -184,7 +185,10 @@ def assess(sig: pd.Series) -> dict:
                 red = True
                 reasons.append(f"动量外推峰值 {mom:.2f}≥{TH_MOM_R} (渌渚{sig.lz:.2f}+6h涨{sig.lz_r6:+.2f})")
             mom_lzz = sig.lzz + max(0.0, sig.lzz_r6) if not np.isnan(sig.lzz) else np.nan
-            if not np.isnan(mom_lzz) and mom_lzz >= TH_LZZ_MOM_R:
+            # 渌渚≥5.5 佐证门 (2025样本外): 支流孤涨不淹岛(干流低水位稀释支流峰),
+            # 真事件首红时渌渚5.85/6.66, 2025三次误撤时4.88~5.35 全被滤掉
+            if (not np.isnan(mom_lzz) and mom_lzz >= TH_LZZ_MOM_R
+                    and not np.isnan(sig.lz) and sig.lz >= TH_LZ_GATE_RED):
                 red = True
                 reasons.append(f"支流动量外推峰值 {mom_lzz:.2f}≥{TH_LZZ_MOM_R} "
                                f"(渌渚镇{sig.lzz:.2f}+6h涨{sig.lzz_r6:+.2f})")
