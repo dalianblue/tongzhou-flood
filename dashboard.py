@@ -99,7 +99,9 @@ def _bg_loop():
 
 def _stale(cache: dict) -> bool:
     try:
-        return pd.Timestamp.now() - pd.Timestamp(cache["fetched_at"]) > pd.Timedelta(seconds=REFRESH_SEC)
+        age = pd.Timestamp.now() - pd.Timestamp(cache["fetched_at"])
+        limit = ALERT_REFRESH_SEC if cache.get("level") in ("黄", "红") else REFRESH_SEC
+        return age > pd.Timedelta(seconds=limit)
     except Exception:
         return True
 

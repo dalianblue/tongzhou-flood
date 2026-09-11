@@ -93,7 +93,8 @@ def load_archive_hours(start=None, end=None, path=None) -> pd.DataFrame:
     # (8/9 洪水期传感器故障出 10~18m 读数, 上下游对照可全部剔除)
     w["xt"] = w["xt"].where(w["xt"] < 12)
     lz_ff = w["luzhu"].reindex(w.index, method="ffill", tolerance=pd.Timedelta("1h"))
-    w["xt"] = w["xt"].where((w["xt"] - lz_ff).abs() <= 2.0)
+    # 渌渚未知时保留 xt (不能因上游站缺失而弄瞎现报级判据)
+    w["xt"] = w["xt"].where(lz_ff.isna() | ((w["xt"] - lz_ff).abs() <= 2.0))
     return w.resample("h").median()
 
 
@@ -381,10 +382,10 @@ def live_snapshot(hours: float = 72.0) -> dict:
     h = df.resample("h").median()
     if "lzz" not in h:
         h["lzz"] = np.nan
-    # 新桐乡非物理值剔除 (同归档清洗): 与上游渌渚差>2m 置NaN
+    # 新桐乡非物理值剔除 (同归档清洗): 与上游渌渚差>2m 置NaN; 渌渚未知时保留
     if "xt" in h and "luzhu" in h:
         lz_ff = h["luzhu"].reindex(h.index, method="ffill", tolerance=pd.Timedelta("1h"))
-        h["xt"] = h["xt"].where((h["xt"] - lz_ff).abs() <= 2.0)
+        h["xt"] = h["xt"].where(lz_ff.isna() | ((h["xt"] - lz_ff).abs() <= 2.0))
     series = {c: [[t.strftime("%Y-%m-%dT%H:%M"), None if np.isnan(v) else round(v, 3)]
                   for t, v in h[c].items()] for c in h.columns}
     sg = signals(h)
