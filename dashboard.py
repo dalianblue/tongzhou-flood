@@ -72,6 +72,10 @@ def _fetch_once():
         except Exception as e:
             ty = {"typhoons": [], "prealert": False, "error": repr(e)[:80]}
         out = _snap_to_json(FW.live_snapshot(), ty)
+        try:
+            out["rain"] = FW.fetch_rain()
+        except Exception:
+            out["rain"] = []
         CACHE.parent.mkdir(exist_ok=True)
         CACHE.write_text(json.dumps(out, ensure_ascii=False))
         _state["fetched_at"], _state["error"] = out["fetched_at"], None
@@ -158,7 +162,8 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
 <div class="card"><div class="row">
   <div><span class="lvname">当前风险等级</span><span id="badge" class="badge b-绿">绿</span>
     <span id="est" style="margin-left:12px;color:var(--dim);font-size:13px"></span></div>
-</div><div id="reasons"></div><div id="stations"></div><div id="tyline"></div></div>
+</div><div id="reasons"></div><div id="stations"></div><div id="tyline"></div>
+<div id="rainline" style="margin-top:10px;font-size:13px;color:var(--dim)"></div></div>
 
 <div class="card"><h2>近72小时水位（实况拉取）</h2><div id="chart"></div></div>
 
@@ -215,6 +220,10 @@ async function loadLatest(){
       `${t.name}(${t.num}) ${t.grade} 距岛${t.cur_km}km${t.fc_min_km!=null?` · 72h预报最近${t.fc_min_km}km`:''}`).join('；')
       + (d.typhoon.prealert?' — <b>预备级: 台风将影响, 预期水库预泄+支流涨水, 提前巡查</b>':'');
   } else ty.className='tyline';
+  const rl = document.getElementById('rainline');
+  rl.textContent = (d.rain && d.rain.length) ? '流域近3日雨量: '
+    + [...new Set(d.rain.map(x=>x.station))].map(s=>s+' '
+      + d.rain.filter(x=>x.station===s).map(x=>x.date.slice(5)+' '+x.drp+'mm').join(' | ')).join('　·　') : '';
   const S = d.series;
   charts.live.setOption(baseOpt([
     {name:NAMES.baxia,data:S.baxia,color:'#5aa2ff'},

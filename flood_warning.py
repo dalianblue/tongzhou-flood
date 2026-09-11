@@ -307,6 +307,40 @@ def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90,
     return s
 
 
+RAIN_STATIONS = [("70101500", "富春江电站"), ("70115580", "肖岭水库")]  # 距岛最近且有雨量的站(桐庐)
+
+
+def fetch_rain(days: int = 3) -> list:
+    """近N日流域日雨量 → [{station, date, drp(mm)}]. rest/rain 接口, 日粒度.
+    用于事件归因与风险卡展示 (未参与等级判定——无逐时样本可校准)."""
+    import json
+    import ssl
+    import urllib.request
+    from datetime import datetime, timedelta
+    et = datetime.now()
+    st = et - timedelta(days=days)
+    out = []
+    for i, (stcd, name) in enumerate(RAIN_STATIONS):
+        url = (f"https://sqfb.slt.zj.gov.cn/rest/rain/getRealAndHisRain?stcd={stcd}"
+               f"&st={st:%Y-%m-%d}&et={et:%Y-%m-%d}")
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        d = None
+        for _ in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=30,
+                                            context=ssl.create_default_context()) as r:
+                    d = json.loads(r.read().decode("utf-8"))
+                break
+            except Exception:
+                time.sleep(5)
+        for row in (d or []):
+            if row.get("drp") is not None:
+                out.append({"station": name, "date": row["tm"], "drp": round(float(row["drp"]), 1)})
+        if i < len(RAIN_STATIONS) - 1:
+            time.sleep(5)
+    return out
+
+
 def live_snapshot(hours: float = 72.0) -> dict:
     """实况快照: 4次API (坝下/渌渚/渌渚镇/闸口, 各hours窗口), 间隔26s限频.
     返回 {time, series(逐时清洗后, tz-naive北京时间字符串), sig, assess}."""
@@ -358,7 +392,18 @@ def cmd_check():
     for x in r["reasons"]:
         print(f"  - {x}")
     if r["level"] == "绿":
-        print(f"  (各站低于黄警阈值; 淹没阈值 新桐乡 黄{TH_FLOOD_Y}m/红{TH_FLOOD_R}m)")
+        print(f"  ({r['reasons'][-1] if r['reasons'] else '各站低于黄警阈值'}; "
+              f"淹没阈值 新桐乡 黄{TH_FLOOD_Y}m/红{TH_FLOOD_R}m)")
+    # 流域日雨量 (归因参考, 不参与等级判定)
+    try:
+        rain = fetch_rain()
+        if rain:
+            print("\n流域近3日雨量:")
+            for st in {x["station"] for x in rain}:
+                days = [f"{x['date'][-5:]} {x['drp']:.0f}mm" for x in rain if x["station"] == st]
+                print(f"  {st}: " + " | ".join(days))
+    except Exception as e:
+        print(f"\n流域雨量: 拉取失败({repr(e)[:40]}), 跳过")
     # 台风因素 (预备级, 独立于水位等级): 72h预报路径距岛≤500km → 水库大概率预泄
     try:
         import typhoon as TYPH
