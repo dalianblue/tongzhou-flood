@@ -22,7 +22,7 @@ import typhoon as TYPH
 BASE = Path(__file__).resolve().parent
 CACHE = BASE / "data" / "live_cache.json"
 REFRESH_SEC = 3600
-ALERT_REFRESH_SEC = 900  # 黄/红时加密到15分钟 (夜间快速上涨响应)
+ALERT_REFRESH_SEC = 1800  # 黄/红时加密到30分钟 (夜间快速上涨响应, 仍守限频)
 
 EVENTS = {  # 事件复盘窗口 (起点前48h含预警提前量)
     "2026-07-13": ("2026-07-10", "2026-07-16"),
@@ -92,7 +92,7 @@ def _bg_loop():
         if c is None or _stale(c):
             _fetch_once()
             c = _load_cache() or {}
-        # 报警时加密拉取: 黄/红 15分钟一次 (5次API×26s间隔=2.3次/分, 守限频), 绿时1小时
+        # 报警时加密拉取: 黄/红 30分钟一次 (5次API×26s间隔=2.3次/分, 守限频), 绿时1小时
         interval = ALERT_REFRESH_SEC if c.get("level") in ("黄", "红") else REFRESH_SEC
         time.sleep(max(60, interval - int(time.time() % interval)))
 
