@@ -181,7 +181,7 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
   <select id="evsel" onchange="loadHist(this.value)">
     <option value="2026-07-13">2026-07-13 台风暴雨 206mm</option>
     <option value="2026-08-09">2026-08-09 台风外围 242mm</option>
-    <option value="2025-06-15">2025-06-15 梅雨+泄洪 峰8.28m</option>
+    <option value="2025-06-15">2025-06-15 梅雨（数据不可信，无曲线）</option>
     <option value="2024-06-26">2024-06-26 特大洪水 峰9.61m（无曲线）</option>
   </select><span style="color:var(--dim);font-size:12px">色带 = 逐时预警等级</span></div>
 <div id="evnote" style="color:var(--dim);font-size:12px;margin-bottom:6px"></div>
@@ -189,12 +189,11 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
 
 <div class="card"><h2>模型验证与行动指引</h2>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:13px;line-height:1.8">
-<div><b style="color:var(--txt)">三年五场洪水验证</b><br>
-· 2026（校准年）：4 次过阈全中，首黄提前 19/48/39/48h<br>
-· 2025（样本外重放）：6/15 梅雨洪水（峰 8.28m）命中，首黄 9h、首红 3h，过淹时已红灯<br>
+<div><b style="color:var(--txt)">洪水事件验证</b><br>
+· 2026（校准年）：4 次过阈全中，首黄提前 19/48/39/48h，6 次过淹时刻（含 4 次复淹）全亮灯<br>
 · 2024（官方简报）：上游首警领先岛峰 23.5h；官方"保证水位"红警与岛进水同时——等官方红警再撤已经晚了<br>
-· 误报：黄约每 3~5 天一次（多为电站调峰毛刺）；撤离级（红）经 2025 样本外加门后真误撤≈0<br>
-· 边界：阈值基于中等量级（峰 6.5~8.3m）校准；快涨型红警提前量仅 3h</div>
+· 2025-06-15：接口回溯水位被判定<b>不可信</b>（官方简报显示中等洪水、居民证实未淹桥下，但接口数据虚高至特大洪水量级）——教训：历史回溯数据必须交叉验证<br>
+· 误报：黄约每 3~5 天一次（多为电站调峰毛刺）；阈值基于中等量级（峰 6.5~7.6m）校准</div>
 <div><b style="color:var(--txt)">居民行动指引</b><br>
 · <span style="color:var(--lvR)">红</span>＝岛进水/即将进水，<b>立即撤离</b><br>
 · <span style="color:var(--lvY)">黄</span>＝留意水位，睡前开报警声<br>
@@ -291,8 +290,10 @@ async function loadLatest(){
 }
 
 const WIN = {'2026-07-13':['2026-07-10','2026-07-16','2026'],'2026-08-09':['2026-08-07','2026-08-13','2026'],
-             '2025-06-15':['2025-06-12','2025-06-18','2025'],'2024-06-26':null};
+             '2025-06-15':null,'2024-06-26':null};
 async function loadHist(day){
+  if(day==='2025-06-15'){ document.getElementById('evnote').textContent =
+    '2025-06-15: 接口回溯的水位数据经官方简报+居民证词判定不可信(量级虚高), 已从验证依据中移除'; return; }
   if(day==='2024-06-26'){ document.getElementById('evnote').textContent =
     '2024-06-26 特大洪水(岛峰9.61m, 1997年来最高): 水位接口无该年数据, 无曲线; 官方简报验证见下方"模型验证"卡'; return; }
   const [a,b,src] = WIN[day];
