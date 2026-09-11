@@ -71,13 +71,13 @@ def clean(s: pd.Series, cap: float = None) -> pd.Series:
     return s.mask((s - med).abs() > 1.0)
 
 
-def load_archive_hours(start=None, end=None) -> pd.DataFrame:
+def load_archive_hours(start=None, end=None, path=None) -> pd.DataFrame:
     """归档 → 逐时中位 DataFrame (列: baxia/luzhu/lzz/xi1..3/zk/xt). 零API."""
     keep = {v: k for k, v in STATIONS.items()}
     for z in ZM_XI:
         keep[z] = "xi" + z[-2]
     parts = []
-    for ch in pd.read_csv(ARCHIVE_CSV, usecols=["sample_ts", "zh", "sw"],
+    for ch in pd.read_csv(path or ARCHIVE_CSV, usecols=["sample_ts", "zh", "sw"],
                           low_memory=False, chunksize=500000):
         parts.append(ch[ch.zh.isin(keep)])
     df = pd.concat(parts, ignore_index=True)
@@ -480,6 +480,53 @@ def cmd_fill_gaps():
     print(f"补 {len(new_rows)} 行 → {ARCHIVE_CSV} (现共 {len(out)} 行)")
 
 
+def cmd_harvest_year(year: int, start=None, end=None):
+    """收割任意年份汛期 8 站 → data/hydro_{year}.csv (样本外验证用).
+    10天/块 × 8站, 间隔26s限频; 接口随机空返回→空结果重试; 增量落盘可断点续收."""
+    import csv as _csv
+    from datetime import datetime, timedelta
+    zh_list = list(STATIONS.values()) + list(ZM_XI)  # 真站号 (勿用 STATIONS 键——那是站名)
+    st = pd.Timestamp(start or f"{year}-06-01")
+    et = pd.Timestamp(end or f"{year}-10-15")
+    out_csv = BASE_DIR / "data" / f"hydro_{year}.csv"
+    out_csv.parent.mkdir(exist_ok=True)
+    done = set()
+    if out_csv.exists() and out_csv.stat().st_size > 0:
+        have = pd.read_csv(out_csv)
+        for (zh, day), g in have.groupby([have.zh, pd.to_datetime(have.sample_ts).dt.date]):
+            if len(g) > 100:  # 该站该日已收全 (约288条/日)
+                done.add((zh, str(day)))
+    calls = []
+    cur = st
+    while cur < et:
+        nxt = min(cur + timedelta(days=10), et)
+        calls.append((cur, nxt))
+        cur = nxt
+    n = 0
+    with open(out_csv, "a", newline="") as f:
+        w = _csv.writer(f)
+        if out_csv.stat().st_size == 0:
+            w.writerow(["sample_ts", "zh", "sw"])
+        for a, b in calls:
+            for zh in zh_list:
+                n += 1
+                days = pd.date_range(a, b - timedelta(hours=1), freq="D")
+                if all((zh, str(d.date())) in done for d in days):
+                    continue
+                s = pd.Series(dtype=float)
+                for _ in range(3):  # 接口随机空返回
+                    s = _fetch_window(zh, 2, 0, st=a.to_pydatetime(),
+                                      et=b.to_pydatetime() - timedelta(minutes=1))
+                    if len(s):
+                        break
+                    time.sleep(10)
+                for ts, sw in s.items():
+                    w.writerow([ts.isoformat(), zh, sw])
+                print(f"[{n}] {zh} {a:%m-%d}~{b:%m-%d}: {len(s)}行", flush=True)
+                time.sleep(26)
+    print(f"完成 → {out_csv}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--check", action="store_true", help="实况风险卡 (4次API)")
@@ -487,6 +534,8 @@ def main():
     ap.add_argument("--start"); ap.add_argument("--end")
     ap.add_argument("--demo", metavar="YYYY-MM-DD", help="单事件复盘 (零API)")
     ap.add_argument("--fill-gaps", action="store_true", help="API 回补样本缺日 (每周缺一天)")
+    ap.add_argument("--harvest-year", type=int, metavar="YYYY",
+                    help="收割历史年份汛期8站 → data/hydro_YYYY.csv (样本外验证)")
     a = ap.parse_args()
     if a.backtest:
         sys.exit(cmd_backtest(a.start, a.end))
@@ -494,6 +543,8 @@ def main():
         cmd_demo(a.demo); return
     if a.fill_gaps:
         sys.exit(cmd_fill_gaps())
+    if a.harvest_year:
+        sys.exit(cmd_harvest_year(a.harvest_year, a.start, a.end))
     if a.check:
         sys.exit(cmd_check())
     ap.print_help()
