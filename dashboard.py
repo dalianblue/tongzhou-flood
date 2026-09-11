@@ -106,14 +106,16 @@ def _stale(cache: dict) -> bool:
         return True
 
 
-def history_range(start: str, end: str) -> dict:
-    """归档区间 → 曲线 + 逐时等级 (零API, 全样本内存缓存)."""
+def history_range(start: str, end: str, src: str = "2026") -> dict:
+    """归档区间 → 曲线 + 逐时等级 (零API, 按年份文件内存缓存)."""
     global _hist_cache
-    if _hist_cache is None:
-        h = FW.load_archive_hours()
+    _hist_cache = _hist_cache or {}
+    if src not in _hist_cache:
+        path = BASE / "data" / f"hydro_{src}.csv" if src != "2026" else None
+        h = FW.load_archive_hours(path=path)
         lv = FW.signals(h).apply(FW.assess, axis=1)
-        _hist_cache = (h, [d["level"] for d in lv])
-    h, levels = _hist_cache
+        _hist_cache[src] = (h, [d["level"] for d in lv])
+    h, levels = _hist_cache[src]
     m = (h.index >= f"{start} 00:00") & (h.index <= f"{end} 23:00")
     hh = h[m]
     def col(c):
@@ -177,10 +179,29 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
 <div class="card"><h2>事件复盘（历史样本）</h2>
 <div class="row" style="margin-bottom:10px">
   <select id="evsel" onchange="loadHist(this.value)">
-    <option value="2026-07-13">2026-07-13 台风+泄洪</option>
-    <option value="2026-08-09">2026-08-09 台风外围</option>
+    <option value="2026-07-13">2026-07-13 台风暴雨 206mm</option>
+    <option value="2026-08-09">2026-08-09 台风外围 242mm</option>
+    <option value="2025-06-15">2025-06-15 梅雨+泄洪 峰8.28m</option>
+    <option value="2024-06-26">2024-06-26 特大洪水 峰9.61m（无曲线）</option>
   </select><span style="color:var(--dim);font-size:12px">色带 = 逐时预警等级</span></div>
+<div id="evnote" style="color:var(--dim);font-size:12px;margin-bottom:6px"></div>
 <div id="hchart"></div></div>
+
+<div class="card"><h2>模型验证与行动指引</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;font-size:13px;line-height:1.8">
+<div><b style="color:var(--txt)">三年五场洪水验证</b><br>
+· 2026（校准年）：4 次过阈全中，首黄提前 19/48/39/48h<br>
+· 2025（样本外重放）：6/15 梅雨洪水（峰 8.28m）命中，首黄 9h、首红 3h，过淹时已红灯<br>
+· 2024（官方简报）：上游首警领先岛峰 23.5h；官方"保证水位"红警与岛进水同时——等官方红警再撤已经晚了<br>
+· 误报：黄约每 3~5 天一次（多为电站调峰毛刺）；撤离级（红）经 2025 样本外加门后真误撤≈0<br>
+· 边界：阈值基于中等量级（峰 6.5~8.3m）校准；快涨型红警提前量仅 3h</div>
+<div><b style="color:var(--txt)">居民行动指引</b><br>
+· <span style="color:var(--lvR)">红</span>＝岛进水/即将进水，<b>立即撤离</b><br>
+· <span style="color:var(--lvY)">黄</span>＝留意水位，睡前开报警声<br>
+· 退水期<b>复淹警戒</b>＝半日潮会反复越阈，<b>暂勿回岛低洼处</b>（4/6 次进水是复淹，多在凌晨）<br>
+· <b>退水确认</b>＝新桐乡持续 6h&lt;5.5m，可回岛查看（实测 89% 安全）<br>
+· 白露（9/7）后预测判据停用，仅监控新桐乡实测——菲特型秋台风尾部由实测兜底</div>
+</div></div>
 </div>
 <script>
 const charts = {live: echarts.init(document.getElementById('chart')),
@@ -269,10 +290,14 @@ async function loadLatest(){
   ].filter(s=>s.data)),true);
 }
 
-const WIN = {'2026-07-13':['2026-07-10','2026-07-16'],'2026-08-09':['2026-08-07','2026-08-13']};
+const WIN = {'2026-07-13':['2026-07-10','2026-07-16','2026'],'2026-08-09':['2026-08-07','2026-08-13','2026'],
+             '2025-06-15':['2025-06-12','2025-06-18','2025'],'2024-06-26':null};
 async function loadHist(day){
-  const [a,b] = WIN[day];
-  const d = await (await fetch(`/api/history?start=${a}&end=${b}`)).json();
+  if(day==='2024-06-26'){ document.getElementById('evnote').textContent =
+    '2024-06-26 特大洪水(岛峰9.61m, 1997年来最高): 水位接口无该年数据, 无曲线; 官方简报验证见下方"模型验证"卡'; return; }
+  const [a,b,src] = WIN[day];
+  document.getElementById('evnote').textContent = '';
+  const d = await (await fetch(`/api/history?start=${a}&end=${b}&src=${src}`)).json();
   const lv = d.levels;
   const pieces = []; let s0 = 0;
   for(let i=1;i<=lv.length;i++) if(i===lv.length||lv[i]!==lv[s0]){
@@ -335,7 +360,7 @@ class Handler(BaseHTTPRequestHandler):
             from urllib.parse import parse_qs, urlparse
             q = parse_qs(urlparse(self.path).query)
             try:
-                self._json(history_range(q["start"][0], q["end"][0]))
+                self._json(history_range(q["start"][0], q["end"][0], q.get("src", ["2026"])[0]))
             except Exception as e:
                 self._json({"error": repr(e)[:120]}, 400)
         else:
