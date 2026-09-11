@@ -22,6 +22,7 @@ import typhoon as TYPH
 BASE = Path(__file__).resolve().parent
 CACHE = BASE / "data" / "live_cache.json"
 REFRESH_SEC = 3600
+ALERT_REFRESH_SEC = 900  # 黄/红时加密到15分钟 (夜间快速上涨响应)
 
 EVENTS = {  # 事件复盘窗口 (起点前48h含预警提前量)
     "2026-07-13": ("2026-07-10", "2026-07-16"),
@@ -90,7 +91,10 @@ def _bg_loop():
         c = _load_cache()
         if c is None or _stale(c):
             _fetch_once()
-        time.sleep(max(60, REFRESH_SEC - int(time.time() % REFRESH_SEC)))
+            c = _load_cache() or {}
+        # 报警时加密拉取: 黄/红 15分钟一次 (5次API×26s间隔=2.3次/分, 守限频), 绿时1小时
+        interval = ALERT_REFRESH_SEC if c.get("level") in ("黄", "红") else REFRESH_SEC
+        time.sleep(max(60, interval - int(time.time() % interval)))
 
 
 def _stale(cache: dict) -> bool:
@@ -157,7 +161,8 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
 .row{display:flex;justify-content:space-between;align-items:center}
 </style></head><body><div class="wrap">
 <header><h1>桐洲岛淹没预警<small>淹没阈值 新桐乡 黄6.5m / 红7.0m</small></h1>
-<div><span id="meta">加载中…</span> <button id="btn" onclick="refresh()">立即刷新</button></div></header>
+<div><span id="meta">加载中…</span> <button id="btn" onclick="refresh()">立即刷新</button>
+<button id="alarmBtn" onclick="enableAlarm()">🔕 开启报警声(睡前点我)</button></div></header>
 
 <div class="card"><div class="row">
   <div><span class="lvname">当前风险等级</span><span id="badge" class="badge b-绿">绿</span>
@@ -193,12 +198,41 @@ function baseOpt(series, markLines){
       lineStyle:{color:s.markColor||'#e0a63a',type:'dashed'},data:[{yAxis:s.mark}]}:undefined}))};
 }
 
+let lastLevel = null, audioCtx = null, alarmOn = false, beepTimer = null;
+function beep(times){ // WebAudio 警报音 (无需音频文件)
+  if(!audioCtx) return;
+  for(let i=0;i<times;i++){
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = 880; o.type='square';
+    const t = audioCtx.currentTime + i*0.6;
+    g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.45);
+    o.start(t); o.stop(t+0.5);
+  }
+}
+function alarm(level){
+  document.title = (level==='红' ? '🔴 撤离! ' : '🟡 警报! ') + '桐洲岛淹没预警';
+  if(!alarmOn) return;
+  beep(level==='红' ? 8 : 3);
+  if(level==='红' && !beepTimer) beepTimer = setInterval(()=>beep(8), 6000); // 红警持续响
+  if(level!=='红' && beepTimer){ clearInterval(beepTimer); beepTimer = null; }
+}
+function enableAlarm(){
+  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+  audioCtx.resume(); alarmOn = !alarmOn;
+  document.getElementById('alarmBtn').textContent = alarmOn ? '🔔 报警声已开启' : '🔕 开启报警声(睡前点我)';
+  if(alarmOn) beep(1);
+}
+
 async function loadLatest(){
   const d = await (await fetch('/api/latest')).json();
   const st = await (await fetch('/api/status')).json();
   const meta = document.getElementById('meta');
   if(!d){ meta.innerHTML = st.running ? '首次拉取中（约2分钟，受接口限频）…' :
     `<span class="err">尚无数据</span>`; return; }
+  if(lastLevel !== d.level && (d.level==='黄'||d.level==='红')) alarm(d.level);
+  if(d.level==='绿'){ document.title='桐洲岛淹没预警'; if(beepTimer){clearInterval(beepTimer);beepTimer=null;} }
+  lastLevel = d.level;
   const ago = st.running ? ' [刷新中…]' : '';
   meta.innerHTML = st.error ? `<span class="err">上次成功 ${d.fetched_at}${ago} · 拉取失败: ${st.error}</span>`
     : `数据时间 ${d.fetched_at}${ago}`;
