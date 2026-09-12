@@ -111,7 +111,8 @@ def history_range(start: str, end: str, src: str = "2026") -> dict:
     global _hist_cache
     _hist_cache = _hist_cache or {}
     if src not in _hist_cache:
-        path = BASE / "data" / f"hydro_{src}.csv" if src != "2026" else None
+        path = (BASE / "verification" / "meiyu_2025-06-14_20.csv" if src == "2025"
+                else BASE / "data" / f"hydro_{src}.csv" if src != "2026" else None)
         h = FW.load_archive_hours(path=path)
         lv = FW.signals(h).apply(FW.assess, axis=1)
         _hist_cache[src] = (h, [d["level"] for d in lv])
@@ -181,7 +182,7 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
   <select id="evsel" onchange="loadHist(this.value)">
     <option value="2026-07-13">2026-07-13 台风暴雨 206mm</option>
     <option value="2026-08-09">2026-08-09 台风外围 242mm</option>
-    <option value="2025-06-15">2025-06-15 梅雨（数据不可信，无曲线）</option>
+    <option value="2025-06-15">2025-06-15 梅雨特大洪水 坝下11.8m（独立验证数据）</option>
     <option value="2024-06-26">2024-06-26 特大洪水 峰9.61m（无曲线）</option>
   </select><span style="color:var(--dim);font-size:12px">色带 = 逐时预警等级</span></div>
 <div id="evnote" style="color:var(--dim);font-size:12px;margin-bottom:6px"></div>
@@ -192,7 +193,8 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
 <div><b style="color:var(--txt)">洪水事件验证</b><br>
 · 2026（校准年）：4 次过阈全中，首黄提前 19/48/39/48h，6 次过淹时刻（含 4 次复淹）全亮灯<br>
 · 2024（官方简报）：上游首警领先岛峰 23.5h；官方"保证水位"红警与岛进水同时——等官方红警再撤已经晚了<br>
-· 2025-06-15：接口回溯水位被判定<b>不可信</b>（官方简报显示中等洪水、居民证实未淹桥下，但接口数据虚高至特大洪水量级）——教训：历史回溯数据必须交叉验证<br>
+· 2025-06-15（独立验证数据重放）：真实特大洪水（坝下 11.8m 超 2026 全部事件），首红提前 14h；岛擦线未淹（新桐乡 7.27m 且短暂），与居民证词一致<br>
+· 实地校正：岛上自记水位仪实测 987h，新桐乡站 = 岛上局部水深 + 2.13m（σ=0.06m）——淹没阈值 6.5/7.0m 获得物理锚定<br>
 · 误报：黄约每 3~5 天一次（多为电站调峰毛刺）；阈值基于中等量级（峰 6.5~7.6m）校准</div>
 <div><b style="color:var(--txt)">居民行动指引</b><br>
 · <span style="color:var(--lvR)">红</span>＝岛进水/即将进水，<b>立即撤离</b><br>
@@ -290,14 +292,12 @@ async function loadLatest(){
 }
 
 const WIN = {'2026-07-13':['2026-07-10','2026-07-16','2026'],'2026-08-09':['2026-08-07','2026-08-13','2026'],
-             '2025-06-15':null,'2024-06-26':null};
+             '2025-06-15':['2025-06-14','2025-06-20','2025'],'2024-06-26':null};
 async function loadHist(day){
-  if(day==='2025-06-15'){ document.getElementById('evnote').textContent =
-    '2025-06-15: 接口回溯的水位数据经官方简报+居民证词判定不可信(量级虚高), 已从验证依据中移除'; return; }
   if(day==='2024-06-26'){ document.getElementById('evnote').textContent =
     '2024-06-26 特大洪水(岛峰9.61m, 1997年来最高): 水位接口无该年数据, 无曲线; 官方简报验证见下方"模型验证"卡'; return; }
-  const [a,b,src] = WIN[day];
   document.getElementById('evnote').textContent = '';
+  const [a,b,src] = WIN[day];
   const d = await (await fetch(`/api/history?start=${a}&end=${b}&src=${src}`)).json();
   const lv = d.levels;
   const pieces = []; let s0 = 0;
