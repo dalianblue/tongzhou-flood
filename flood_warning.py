@@ -366,6 +366,63 @@ def read_weather(hours: float = 24.0) -> dict:
     }
 
 
+def read_ecowitt(authorize: str) -> dict:
+    """Ecowitt 云端实时数据(与 read_weather 同构) — 走分享页会话:
+    开分享页拿cookie → get_device_list → get_data(今日+昨日). 英制→公制换算.
+    authorize 为分享网址 ?authorize= 参数."""
+    import http.cookiejar
+    import json as _json
+    import urllib.parse
+    cj = http.cookiejar.CookieJar()
+    op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    op.addheaders = [("User-Agent", "Mozilla/5.0")]
+
+    def post(path, data):
+        body = urllib.parse.urlencode(data).encode()
+        r = op.open(urllib.request.Request("https://www.ecowitt.net" + path, data=body,
+                   headers={"Content-Type": "application/x-www-form-urlencoded",
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Referer": f"https://www.ecowitt.net/home/share?authorize={authorize}"}),
+                   timeout=30)
+        return _json.loads(r.read().decode("utf-8", "ignore"))
+
+    op.open(f"https://www.ecowitt.net/home/share?authorize={authorize}", timeout=30).read()
+    dev = post("/index/get_device_list", {"authorize": authorize})["list"][0]["device_id"]
+    today = pd.Timestamp.now().strftime("%Y-%m-%d")
+    yest = (pd.Timestamp.now() - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    def day(date):
+        d = post("/index/get_data", {"device_id": dev, "is_list": 0, "mode": 0,
+                "sdate": f"{date} 00:00", "edate": f"{date} 23:59", "page": 1,
+                "authorize": authorize, "sortList": "1|2|3|4|5|6|18|49", "hideList": ""})
+        L = d.get("list", {})
+        wl = L.get("wind", {}).get("list", {})
+        rs = L.get("rain_statistcs", {}).get("list", {})
+        def last(k, src):
+            v = [float(x) for x in src.get(k, []) if str(x).strip() not in ("", "none")]
+            return v
+        return wl, rs
+
+    wl_t, rs_t = day(today)
+    wl_y, rs_y = day(yest)
+    MPH, IN = 0.44704, 25.4
+    f = lambda xs: [float(x) for x in xs if str(x).strip() not in ("", "none")]
+    # 近24h = 昨日+今日组合序列的尾部144个样本(10min粒度); 序列存在时区歧义, 不推精确时刻
+    g = (f(wl_y.get("windgustmph", [])) + f(wl_t.get("windgustmph", [])))[-144:]
+    w_ = (f(wl_y.get("windspeedmph", [])) + f(wl_t.get("windspeedmph", [])))[-144:]
+    dr_t = f(rs_t.get("dailyrainin", []))
+    dr_y = f(rs_y.get("dailyrainin", []))
+    today_rain = dr_t[-1] * IN if dr_t else 0.0
+    yest_rain = dr_y[-1] * IN if dr_y else 0.0
+    has_today = bool(f(wl_t.get("windgustmph", [])))
+    return {"asof": f"{today} 今日" if has_today else f"{yest} (今日无数据)",
+            "source": "ecowitt", "age_h": None,
+            "gust": round(max(g) if g else 0.0, 1), "wind": round(max(w_) if w_ else 0.0, 1),
+            "rain24": round(today_rain + yest_rain, 1),
+            "rain_today": round(today_rain, 1), "rain_yest": round(yest_rain, 1),
+            "stale": not has_today}
+
+
 def fetch_rain(days: int = 3) -> list:
     """近N日流域日雨量 → [{station, date, drp(mm)}]. rest/rain 接口, 日粒度.
     用于事件归因与风险卡展示 (未参与等级判定——无逐时样本可校准)."""

@@ -60,6 +60,21 @@ def _r(v) -> float | None:
     return None if v is None or np.isnan(v) else round(float(v), 2)
 
 
+WX_CONFIG = BASE / "data" / "weather_config.json"
+
+
+def _read_wx() -> dict:
+    """气象数据源: 优先 Ecowitt 云端(需在页面配置分享网址), 否则本地 ~/weather CSV."""
+    try:
+        cfg = json.loads(WX_CONFIG.read_text()) if WX_CONFIG.exists() else {}
+        auth = cfg.get("ecowitt_authorize")
+        if auth:
+            return FW.read_ecowitt(auth)
+    except Exception:
+        pass
+    return FW.read_weather()
+
+
 def _fetch_once():
     """一次完整实况拉取 (水位4次API+台风) → 缓存文件."""
     with _state["lock"]:
@@ -82,7 +97,7 @@ def _fetch_once():
         try:
             near = min([t["cur_km"] for t in ty.get("typhoons", []) if "cur_km" in t], default=None)
             rain_y = max([r["drp"] for r in out["rain"] if r["date"] < out["fetched_at"][:10]], default=0)
-            wx = FW.read_weather()
+            wx = _read_wx()
             lzz_ok = out["stations"]["lzz_r6"] is not None and out["stations"]["lzz_r6"] >= 0.5
             f = {"支流": lzz_ok,
                  "风": (not wx.get("stale")) and wx.get("gust", 0) >= FW.TH_GUST,
@@ -184,6 +199,11 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
 <header><h1>桐洲岛淹没预警<small>淹没阈值 新桐乡 黄6.5m / 红7.0m</small></h1>
 <div><span id="meta">加载中…</span> <button id="btn" onclick="refresh()">立即刷新</button>
 <button id="alarmBtn" onclick="enableAlarm()">🔕 开启报警声(睡前点我)</button></div></header>
+<div class="card" style="padding:10px 18px;font-size:12px;color:var(--dim)">
+气象站(风/雨因子): <input id="wxurl" placeholder="贴 Ecowitt 分享网址 (https://www.ecowitt.net/home/share?authorize=…)，换站直接贴新网址"
+  style="background:#0d1420;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:4px 8px;width:52%">
+  <button onclick="saveWx()" style="padding:4px 12px;font-size:12px">保存</button>
+  <span id="wxstat"></span></div>
 
 <div class="card"><div class="row">
   <div><span class="lvname">当前风险等级</span><span id="badge" class="badge b-绿">绿</span>
@@ -308,7 +328,7 @@ async function loadLatest(){
   }
   const wl = (d.weather||{});
   if(wl.asof){
-    document.getElementById('rainline').textContent += (wl.stale?' [气象站停更'+wl.age_h+'h!]':'')
+    document.getElementById('rainline').textContent += (wl.stale?' [气象站停更!]':'')
       + `  ·  本地站: 阵风${wl.gust}m/s(线${d.factors&&d.factors['风']?'✓':'✗'}) 近24h雨${wl.rain24}mm (${wl.asof})`;
   }
   const rl = document.getElementById('rainline');
@@ -364,6 +384,18 @@ async function refresh(){
   poll();
 }
 
+async function saveWx(){
+  const url = document.getElementById('wxurl').value.trim();
+  const r = await (await fetch('/api/weather-config',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({url})})).json();
+  document.getElementById('wxstat').textContent = r.ok?' ✓ 已保存,触发刷新':' ✗ 网址里没找到 authorize 参数';
+}
+(async()=>{
+  const c = await (await fetch('/api/weather-config')).json();
+  if(c.ecowitt_url){ document.getElementById('wxurl').value = c.ecowitt_url;
+    document.getElementById('wxstat').textContent = ' ✓ 已配置'; }
+})();
+
 loadLatest(); loadHist('2026-07-13');
 setInterval(loadLatest, 60000);
 window.onresize = () => Object.values(charts).forEach(c=>c.resize());
@@ -387,6 +419,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(b)))
             self.end_headers()
             self.wfile.write(b)
+        elif self.path == "/api/weather-config":
+            cfg = json.loads(WX_CONFIG.read_text()) if WX_CONFIG.exists() else {}
+            self._json(cfg)
         elif self.path == "/api/latest":
             self._json(_load_cache())
         elif self.path == "/api/status":
@@ -407,6 +442,21 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/refresh":
             threading.Thread(target=_fetch_once, daemon=True).start()
             self._json({"ok": True})
+        elif self.path == "/api/weather-config":
+            # 保存气象站分享网址(明年换网址直接在页面贴新地址) → data/weather_config.json
+            import urllib.parse as _up
+            n = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(n) or b"{}")
+            url = (body.get("url") or "").strip()
+            q = dict(_up.parse_qsl(_up.urlparse(url).query))
+            auth = q.get("authorize") or (url if url and "?" not in url and len(url) < 32 else "")
+            cfg = {"ecowitt_url": url, "ecowitt_authorize": auth} if auth else {}
+            if auth:
+                WX_CONFIG.write_text(json.dumps(cfg, ensure_ascii=False))
+                threading.Thread(target=_fetch_once, daemon=True).start()
+            elif WX_CONFIG.exists():
+                WX_CONFIG.unlink()  # 清空则回退本地CSV
+            self._json({"ok": bool(auth), "authorize": auth or None})
         else:
             self._json({"error": "not found"}, 404)
 
