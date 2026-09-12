@@ -182,7 +182,7 @@ select{background:#0d1420;color:var(--txt);border:1px solid var(--line);border-r
   <select id="evsel" onchange="loadHist(this.value)">
     <option value="2026-07-13">2026-07-13 台风暴雨 206mm</option>
     <option value="2026-08-09">2026-08-09 台风外围 242mm</option>
-    <option value="2025-06-15">2025-06-15 梅雨特大洪水 坝下11.8m（独立验证数据）</option>
+    <option value="2025-06-15">2025-06-15 梅雨特大洪水 干流漫溢型（擦线未淹）</option>
     <option value="2024-06-26">2024-06-26 特大洪水 峰9.61m（无曲线）</option>
   </select><span style="color:var(--dim);font-size:12px">色带 = 逐时预警等级</span></div>
 <div id="evnote" style="color:var(--dim);font-size:12px;margin-bottom:6px"></div>
@@ -218,8 +218,10 @@ function baseOpt(series, markLines){
   yAxis:{scale:true,axisLabel:{color:'#7d8fa8'},splitLine:{lineStyle:{color:'#1a2540'}}},
   series:series.map(s=>({name:s.name,type:'line',showSymbol:false,data:s.data,
     lineStyle:{width:s.wide?2.5:1.4,color:s.color||'#5aa2ff'},color:s.color,
-    markLine:s.mark?{symbol:'none',silent:true,label:{color:s.markColor||'#e0a63a',formatter:s.mark},
-      lineStyle:{color:s.markColor||'#e0a63a',type:'dashed'},data:[{yAxis:s.mark}]}:undefined}))};
+    markLine:s.mark?{symbol:'none',silent:true,
+      data:(Array.isArray(s.mark)?s.mark:[s.mark]).map(m=>({yAxis:m,
+        label:{color:m>=8?'#e05252':'#e0a63a',formatter:m>=8?'漫溢线'+m:m},
+        lineStyle:{color:m>=8?'#e05252':'#e0a63a',type:'dashed'}}))}:undefined}))};
 }
 
 let lastLevel = null, audioCtx = null, alarmOn = false, beepTimer = null;
@@ -296,7 +298,10 @@ const WIN = {'2026-07-13':['2026-07-10','2026-07-16','2026'],'2026-08-09':['2026
 async function loadHist(day){
   if(day==='2024-06-26'){ document.getElementById('evnote').textContent =
     '2024-06-26 特大洪水(岛峰9.61m, 1997年来最高): 水位接口无该年数据, 无曲线; 官方简报验证见下方"模型验证"卡'; return; }
-  document.getElementById('evnote').textContent = '';
+  document.getElementById('evnote').textContent = day==='2025-06-15'
+    ? '干流漫溢型: 站网峰8.07m(持续≥7.0共30h), 距干流漫溢线(8.1~9.2m, 即实测仪6~7m口径)差一线 → 基地未淹。'
+      + '色带红警是台风复合型口径(6.5/7.0)的保守触发(宁撤勿漏); 2026两次为复合进水型(暴雨内涝+支流回灌+风壅), 干流未漫溢也淹——两层淹没线'
+    : '';
   const [a,b,src] = WIN[day];
   const d = await (await fetch(`/api/history?start=${a}&end=${b}&src=${src}`)).json();
   const lv = d.levels;
@@ -309,7 +314,7 @@ async function loadHist(day){
   charts.hist.setOption(baseOpt([
     {name:NAMES.baxia,data:d.series.baxia,color:'#5aa2ff'},
     {name:NAMES.luzhu,data:d.series.luzhu,color:'#e8c26a',wide:true,mark:7.0},
-    {name:NAMES.xt,data:d.series.xt,color:'#ff9d5c',wide:true,mark:6.5},
+    {name:NAMES.xt,data:d.series.xt,color:'#ff9d5c',wide:true,mark:[6.5,8.1]},
     {name:NAMES.zk,data:d.series.zk,color:'#6acfe8'},
   ]));
   charts.hist.setOption({series:[{},{markArea:{silent:true,data:pieces}},{},{}]});
