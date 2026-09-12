@@ -103,6 +103,57 @@ def live_threat() -> dict:
                 out["prealert"] = True
         except Exception as e:
             out["typhoons"].append({"name": name, "error": repr(e)[:60]})
+    # zj121 (浙江台风网) 补充: 官方实时风速/等级 — 失败静默跳过(NMC已够用)
+    try:
+        for z in zj121_live():
+            for rec in out["typhoons"]:
+                if rec.get("num") and rec["num"] in z["num"]:
+                    rec["wind_ms"] = z["wind_ms"]
+                    rec["grade"] = z["grade"]
+                    break
+    except Exception:
+        pass
+    return out
+
+
+# ---- zj121 (smart.zj121.com 台风网, 带HMAC签名网关) ----
+ZJ_BASE = "https://szpt.zj121.com/sph-main/zjcloud-gw/SJFW20260709160404/"
+ZJ_KEY, ZJ_SECRET = "QGN64U8UH6DE6Y6N", "sk_8e169d17f5b8484b9ffb408d061592b3"
+
+
+def _zj121_call(ep: str, params: dict):
+    import hashlib
+    import time as _t
+    import random as _rand
+    qs = "&".join(f"{k}={params[k]}" for k in sorted(params))
+    h = {"appKey": ZJ_KEY, "timestamp": str(int(_t.time() * 1000)),
+         "nonce": (format(int(_t.time() * 1000), "x")
+                   + "".join(_rand.choice("0123456789abcdefghijklmnopqrstuvwxyz") for _ in range(20)))[:32]}
+    h["sign"] = hashlib.sha256((qs + "&".join(f"{k}={h[k]}" for k in sorted(h)) + ZJ_SECRET).encode()).hexdigest()
+    import urllib.parse
+    req = urllib.request.Request(ZJ_BASE + ep + "?" + urllib.parse.urlencode(params),
+                                 headers={**h, "User-Agent": "Mozilla/5.0", "Referer": "https://smart.zj121.com/"})
+    return json.loads(urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "ignore"))
+
+
+def zj121_live() -> list:
+    """浙江台风网活动台风 → [{num, name, wind_ms, grade, cur_km}] (官方实时风速, WINF m/s)."""
+    year = time.localtime().tm_year
+    lst = (_zj121_call("getTyphoonListByYear", {"year": str(year), "limitCnt": "100"}).get("DS") or [])
+    out = []
+    for t in lst:
+        if t.get("IsActive") != "1":
+            continue
+        try:
+            ds = _zj121_call("getTyphoonLivePathByCode", {"typhNo": t["Num_Nati"]}).get("DS") or []
+            if not ds:
+                continue
+            last = ds[-1]
+            out.append({"num": t["Num_Nati"], "name": t.get("TYPH_Name_CN") or t["TYPH_Name_INT"],
+                        "wind_ms": last.get("WINF"), "grade": last.get("Typh_Grade"),
+                        "cur_km": round(dist_km(float(last["Lon"]), float(last["Lat"])))})
+        except Exception:
+            continue
     return out
 
 

@@ -549,6 +549,8 @@ def cmd_check():
                 print(f"  {t['name']}: 拉取失败 {t['error']}")
             else:
                 line = f"  {t['name']}({t['num']}) {t['grade']} 距岛{t['cur_km']}km"
+                if t.get("wind_ms"):
+                    line += f" 风速{t['wind_ms']}m/s"
                 if t["fc_min_km"] is not None:
                     line += f", 72h预报最近{t['fc_min_km']}km({t['fc_at']})"
                 print(line)

@@ -317,7 +317,7 @@ async function loadLatest(){
   if(d.typhoon && d.typhoon.typhoons && d.typhoon.typhoons.length){
     ty.className = 'tyline' + (d.typhoon.prealert?' ty-on':'');
     ty.innerHTML = '台风: ' + d.typhoon.typhoons.map(t=>t.error ? `${t.name} 拉取失败` :
-      `${t.name}(${t.num}) ${t.grade} 距岛${t.cur_km}km${t.fc_min_km!=null?` · 72h预报最近${t.fc_min_km}km`:''}`).join('；')
+      `${t.name}(${t.num}) ${t.grade} 距岛${t.cur_km}km${t.wind_ms?` 风速${t.wind_ms}m/s`:''}${t.fc_min_km!=null?` · 72h预报最近${t.fc_min_km}km`:''}`).join('；')
       + (d.typhoon.prealert?' — <b>预备级: 台风将影响, 预期水库预泄+支流涨水, 提前巡查</b>':'');
   } else ty.className='tyline';
   if(d.compound){
