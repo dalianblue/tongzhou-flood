@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>桐洲岛洪水研究报告 · 2026 汛期</title>
+<style>
+  :root{
+    --paper:#f7f4ec;
+    --paper-deep:#efe9dc;
+    --ink:#1c2b33;
+    --ink-soft:#4a5b64;
+    --blue:#2c5f7c;
+    --blue-deep:#1d4258;
+    --red:#b5402e;
+    --amber:#a06a14;
+    --rule:#c9c0ad;
+    --serif:"Songti SC","Noto Serif CJK SC","Source Han Serif SC","STSong",serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+    --mono:"SF Mono","Menlo",Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:16.5px;
+    line-height:1.85;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* 宣纸底纹 */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:radial-gradient(ellipse at 15% 8%,rgba(44,95,124,.05),transparent 55%),
+                     radial-gradient(ellipse at 88% 92%,rgba(181,64,46,.04),transparent 50%);
+  }
+  .page{position:relative;z-index:1;max-width:880px;margin:0 auto;padding:0 28px 90px}
+
+  /* ===== 封面 ===== */
+  header.masthead{
+    padding:72px 0 40px;
+    border-bottom:3px double var(--rule);
+    margin-bottom:44px;
+  }
+  .doc-meta{
+    font-family:var(--sans);font-size:12.5px;letter-spacing:.35em;
+    color:var(--blue);text-transform:uppercase;margin-bottom:22px;
+  }
+  h1.title{
+    font-family:var(--serif);font-weight:700;
+    font-size:clamp(34px,6vw,52px);line-height:1.25;letter-spacing:.04em;
+  }
+  h1.title em{font-style:normal;color:var(--red)}
+  .subtitle{
+    margin-top:14px;font-size:17px;color:var(--ink-soft);letter-spacing:.06em;
+  }
+  .cover-line{
+    margin-top:30px;display:flex;flex-wrap:wrap;gap:10px 34px;
+    font-family:var(--sans);font-size:13px;color:var(--ink-soft);
+    border-top:1px solid var(--rule);padding-top:18px;
+  }
+  .cover-line b{color:var(--ink);font-weight:600}
+
+  /* ===== 摘要 ===== */
+  .abstract{
+    background:var(--paper-deep);
+    border-left:4px solid var(--blue);
+    padding:22px 26px;margin-bottom:48px;
+    font-size:15.5px;line-height:1.9;
+  }
+  .abstract .lbl{
+    font-family:var(--sans);font-weight:700;font-size:13px;
+    letter-spacing:.3em;color:var(--blue);display:block;margin-bottom:8px;
+  }
+
+  /* ===== 目录 ===== */
+  nav.toc{
+    border:1px solid var(--rule);background:#fbf9f3;
+    padding:26px 32px;margin-bottom:64px;
+  }
+  nav.toc .toc-title{
+    font-family:var(--sans);font-size:13px;font-weight:700;
+    letter-spacing:.4em;color:var(--ink-soft);margin-bottom:14px;
+  }
+  nav.toc ol{list-style:none;columns:2;column-gap:48px}
+  nav.toc li{
+    break-inside:avoid;margin:7px 0;font-family:var(--sans);font-size:14px;
+  }
+  nav.toc a{
+    color:var(--ink);text-decoration:none;display:flex;gap:10px;align-items:baseline;
+    border-bottom:1px dotted transparent;
+  }
+  nav.toc a:hover{color:var(--blue);border-bottom-color:var(--blue)}
+  nav.toc .no{
+    font-family:var(--mono);font-size:12px;color:var(--red);min-width:2.2em;
+  }
+
+  /* ===== 章节 ===== */
+  section{margin-bottom:64px}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+  .sec-no{
+    font-family:var(--mono);font-size:15px;color:var(--red);
+    letter-spacing:.05em;white-space:nowrap;
+  }
+  h2{
+    font-family:var(--serif);font-size:26px;font-weight:700;letter-spacing:.03em;
+    padding-bottom:10px;border-bottom:2px solid var(--ink);margin-bottom:22px;
+  }
+  h2 .en{
+    font-family:var(--sans);font-size:11.5px;font-weight:400;
+    color:var(--ink-soft);letter-spacing:.18em;margin-left:12px;
+  }
+  h3{
+    font-family:var(--sans);font-size:17.5px;font-weight:700;
+    margin:34px 0 14px;color:var(--blue-deep);
+  }
+  h3::before{content:"■ ";color:var(--blue);font-size:12px;vertical-align:2px}
+  p{margin:0 0 14px}
+  ul,ol{margin:0 0 16px 1.8em}
+  li{margin-bottom:8px}
+  strong{font-weight:700}
+  .muted{color:var(--ink-soft)}
+  code{
+    font-family:var(--mono);font-size:.86em;background:var(--paper-deep);
+    padding:1px 6px;border-radius:3px;border:1px solid var(--rule);
+  }
+  a{color:var(--blue)}
+  .back-top{
+    font-family:var(--sans);font-size:12px;color:var(--ink-soft);
+    text-decoration:none;float:right;margin-top:-34px;
+  }
+  .back-top:hover{color:var(--red)}
+
+  /* ===== 表格（booktabs 风）===== */
+  .tbl-wrap{overflow-x:auto;margin:20px 0 26px}
+  table{
+    width:100%;border-collapse:collapse;
+    font-family:var(--sans);font-size:14px;line-height:1.65;
+  }
+  caption{
+    caption-side:top;text-align:left;font-family:var(--sans);
+    font-size:13px;color:var(--ink-soft);padding-bottom:8px;letter-spacing:.05em;
+  }
+  thead th{
+    border-top:2.5px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    font-weight:700;text-align:left;padding:9px 12px;white-space:nowrap;
+    background:linear-gradient(rgba(44,95,124,.06),transparent);
+  }
+  tbody td{
+    border-bottom:1px solid var(--rule);padding:9px 12px;vertical-align:top;
+  }
+  tbody tr:last-child td{border-bottom:2.5px solid var(--ink)}
+  tbody tr:hover td{background:rgba(44,95,124,.045)}
+
+  /* 警级色 */
+  .lv-red{color:var(--red);font-weight:700}
+  .lv-amber{color:var(--amber);font-weight:700}
+
+  /* ===== 引文块 ===== */
+  blockquote{
+    margin:22px 0;padding:16px 24px;border-left:3px solid var(--red);
+    background:rgba(181,64,46,.05);font-size:15.5px;
+  }
+  blockquote p:last-child{margin-bottom:0}
+
+  /* ===== 照片 ===== */
+  figure.photos{margin:28px 0 34px}
+  .ph-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .ph-grid img{width:100%;height:auto;display:block;border:1px solid var(--rule)}
+  .ph-grid figure{position:relative}
+  .ph-grid figcaption{
+    font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);
+    padding:8px 2px 0;line-height:1.6;
+  }
+  .ph-tag{
+    position:absolute;top:10px;left:10px;font-family:var(--sans);
+    font-size:11.5px;font-weight:700;color:#fff;background:rgba(28,43,51,.82);
+    padding:3px 10px;letter-spacing:.1em;
+  }
+  .ph-tag.flood{background:rgba(181,64,46,.88)}
+  .ph-tag.normal{background:rgba(44,95,124,.85)}
+
+  /* ===== 定标链 ===== */
+  .chain{
+    display:flex;flex-wrap:wrap;align-items:center;gap:0;
+    font-family:var(--sans);font-size:13.5px;margin:18px 0;
+  }
+  .chain .step{
+    border:1.5px solid var(--blue);color:var(--blue-deep);
+    background:#fbf9f3;padding:7px 14px;font-weight:600;white-space:nowrap;
+  }
+  .chain .arr{color:var(--red);padding:0 10px;font-weight:700}
+  .chain .step.final{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* ===== 结尾 ===== */
+  footer.colophon{
+    margin-top:80px;padding-top:26px;border-top:3px double var(--rule);
+    font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);
+    line-height:2;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  }
+
+  /* ===== 打印 ===== */
+  @media print{
+    body{background:#fff;font-size:11.5pt}
+    body::before{display:none}
+    .page{max-width:none;padding:0}
+    nav.toc{break-after:page}
+    section{break-inside:auto}
+    h2{break-after:avoid}
+    .tbl-wrap,figure.photos,blockquote,.abstract{break-inside:avoid}
+    .back-top{display:none}
+    a{color:inherit;text-decoration:none}
+  }
+  @media (max-width:640px){
+    nav.toc ol{columns:1}
+    .ph-grid{grid-template-columns:1fr}
+    .back-top{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead" id="top">
+  <div class="doc-meta">TONGZHOU ISLAND · HYDROLOGY REPORT · 2026</div>
+  <h1 class="title">桐洲岛洪水<em>研究</em>报告</h1>
+  <p class="subtitle">2026 汛期两次淹没事件的归因、预警模型与淹没线定标</p>
+  <div class="cover-line">
+    <span>覆盖时段 <b>2024-06 — 2026-09</b></span>
+    <span>验证事件 <b>4 场过阈 · 6 次过淹</b></span>
+    <span>配套系统 <b>桐洲岛淹没预警系统（本仓库）</b></span>
+  </div>
+</header>
+
+<div class="abstract">
+  <span class="lbl">摘 要</span>
+  2026 年 7/13（台风"巴威"正面过境）与 8/9（台风"白海豚"外围支流）桐洲岛两次被淹。本报告
+  基于水利厅公开水文数据、流域雨量站、岛上 987h 实地水位观测与三次现场影像定标，完成四项工作：
+  （1）两次淹没均为自然暴雨洪水，"水库过度预泄"指控经雨量数据证伪；（2）建立<b>两层淹没线模型</b>
+  ——干流漫溢线（站网 8.1–9.2m）与台风复合进水线（站网 6.5/7.0m），四场事件全部自洽，
+  "红警即淹没线"经 8/10 淹没照片影像定标；（3）预警规则回测：4 次过阈事件全中、6 次过淹时刻
+  全部亮灯，首红提前 9–48h；（4）2024 官方简报与 2025 独立管道重放两组样本外验证。
+</div>
+
+<nav class="toc">
+  <div class="toc-title">目 录</div>
+  <ol>
+    <li><a href="#s1"><span class="no">01</span>两次淹没事件与归因</a></li>
+    <li><a href="#s2"><span class="no">02</span>汛末对照：节气门控的由来</a></li>
+    <li><a href="#s3"><span class="no">03</span>调度员复盘</a></li>
+    <li><a href="#s4"><span class="no">04</span>预警规则、回测与阈值敏感性</a></li>
+    <li><a href="#s5"><span class="no">05</span>雨量为何不进判据</a></li>
+    <li><a href="#s6"><span class="no">06</span>岛内淹没社会观测标定库</a></li>
+    <li><a href="#s7"><span class="no">07</span>两层淹没线模型</a></li>
+    <li><a href="#s8"><span class="no">08</span>实地水位校正（2026 春）</a></li>
+    <li><a href="#s9"><span class="no">09</span>2025-06-15 梅雨洪水验证</a></li>
+    <li><a href="#s10"><span class="no">10</span>已发现并修复的缺陷</a></li>
+    <li><a href="#s11"><span class="no">11</span>2024 特大洪水历史参照</a></li>
+    <li><a href="#s12"><span class="no">12</span>边界与局限</a></li>
+  </ol>
+</nav>
+
+<!-- ============ 01 ============ -->
+<section id="s1">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 01</span></div>
+  <h2>两次淹没事件与归因<span class="en">EVENTS &amp; ATTRIBUTION</span></h2>
+
+  <ul>
+    <li><strong>7/13 台风暴雨型</strong>：台风"巴威"(BAVI/2609) 7/11 深夜正面过境桐洲岛（最近
+      13km，STS 级），流域两日暴雨 <strong>206mm</strong>（富春江电站，7/11–12），富春江坝下
+      24h 均值冲至 10.78m 全年最高，新桐乡真实峰 <strong>7.61m</strong>。巴威 7/10 距岛
+      1000km+ 时路径已明确 → 台风预警可提前 48h+；</li>
+    <li><strong>8/9 台风外围型</strong>：台风"白海豚"(DOLPHIN/2613) 路径最近 205km（未过境），
+      外围雨带致渌渚江支流暴涨（渌渚镇 6h +1.42m），坝下仅 ~8m，新桐乡真实峰
+      <strong>7.24m</strong>（当日传感器饱和/故障读数已按清洗规则剔除，见 §10）。</li>
+  </ul>
+
+  <h3>两次事件对比</h3>
+  <div class="tbl-wrap"><table>
+    <caption>表 1-1 · 7/13 巴威正面过境 vs 8/9 白海豚外围</caption>
+    <thead><tr><th></th><th>7/13 巴威正面过境</th><th>8/9 白海豚外围</th></tr></thead>
+    <tbody>
+      <tr><td>流域雨量（富春江电站，事件过程）</td><td><strong>206mm / 2天</strong></td><td><strong>242mm / 3天</strong></td></tr>
+      <tr><td>肖岭水库（桐庐，渌渚江侧）</td><td>157mm / 2天</td><td>8/9 单日 190mm</td></tr>
+      <tr><td>坝下 24h 均值峰</td><td><strong>10.78（全年最高）</strong></td><td>8.21</td></tr>
+      <tr><td>坝下 ≥8.6（红泄洪级）时长</td><td><strong>36h</strong></td><td>0h</td></tr>
+      <tr><td>渌渚镇支流 6h 涨幅</td><td>+1.01</td><td>+1.42</td></tr>
+      <tr><td>岛上山溪 6h 涨幅</td><td>+0.14（溪流受基流/上游小库缓冲，<strong>非降雨代理</strong>）</td><td>+0.46</td></tr>
+      <tr><td>新安江电站水位</td><td>7/13 起入库 +1.0m（上游来水）</td><td>全程持平（未放水）</td></tr>
+      <tr><td>新桐乡峰值</td><td><strong>7.61</strong></td><td>7.24</td></tr>
+    </tbody>
+  </table></div>
+
+  <blockquote><p><strong>判断：两次淹没都是自然暴雨洪水，水库"过度预泄"的指控不成立。</strong></p></blockquote>
+
+  <ul>
+    <li>7 月巴威对流域是暴雨台风：7/11–12 坝前区域 206mm。富春江电站是日调节径流电站，
+      库容拦不住区间+兰江来水，坝下 10.78 的峰<strong>大部分是暴雨的被动过流</strong>；主动预泄
+      的证据很小（7/11 坝前仅下降 0.26m）；</li>
+    <li>新安江（有巨量库容）在 7 月拦洪入库仅抬升 1m，已尽拦蓄之责；8 月无放水，无闸可关；</li>
+    <li>山溪站涨幅不能当降雨代理（溪流受基流/上游小库缓冲），流域雨量以雨量站为准。</li>
+  </ul>
+
+  <p>对预警模型的启示：暴雨过流型事件坝下爬升快、起步早，黄警天然提前量大（7 月 +19h）；
+  难的是 8 月那种坝下不动、支流缓涨的型式——为此已把渌渚镇黄阈值降至 0.5（微涨即黄，
+  首黄 15h→39h）、新增渌渚镇动量红判据（首红 5h→9h）。</p>
+</section>
+
+<!-- ============ 02 ============ -->
+<section id="s2">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 02</span></div>
+  <h2>汛末对照：节气门控的由来<span class="en">END-OF-SEASON CASES</span></h2>
+
+  <p>处暑（8/23）之后汛情基本结束，但 9 月实测数据里有两个表面相似、本质相反的案例：</p>
+
+  <div class="tbl-wrap"><table>
+    <caption>表 2-1 · 9/2 渌渚江真实脉冲 vs 9/10–11 潮汐涟漪</caption>
+    <thead><tr><th></th><th>9/2 渌渚江脉冲</th><th>9/10–11 潮汐涟漪</th></tr></thead>
+    <tbody>
+      <tr><td>渌渚 6h 涨幅</td><td><strong>+2.37（真实暴涨）</strong></td><td>+0.92（常规半日潮波动）</td></tr>
+      <tr><td>渌渚水位</td><td><strong>冲到 7.89</strong></td><td>仅 5.31（低基面）</td></tr>
+      <tr><td>新桐乡</td><td><strong>6.46——距黄警阈值仅 4cm</strong></td><td>~5.3，远离阈值</td></tr>
+      <tr><td>本质</td><td>处暑后残余的 10% 汛情</td><td>低流量期潮汐上溯，渌渚水位与岛上脱钩</td></tr>
+      <tr><td>门控后</td><td><strong>照常报警（处暑–白露相位，渌渚≥6.5 涨幅有效）</strong></td><td>不报警（渌渚&lt;6.5，涨幅判据关闭）</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>这正是"节气 + 水位"联合门控的设计依据：单用日期会漏掉 9/2 型脉冲，单用涨幅判据会被
+  潮汐涟漪天天误触发。处暑–白露之间用渌渚 6.5m 作水位配合门即可把两者分开；白露（9/7）
+  之后汛情概率 &lt;5%，预测判据全停，只留新桐乡实测兜底。顺带的收益：回测样本里处暑后
+  （8/23–8/31）的潮汐误报也被同一道门滤掉，黄警误报 72h → 59h。</p>
+</section>
+
+<!-- ============ 03 ============ -->
+<section id="s3">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 03</span></div>
+  <h2>调度员复盘<span class="en">DISPATCHER REVIEW</span></h2>
+  <p class="muted">假设接到台风预报后调度手上有一切权限，能否避免桐洲岛被淹？</p>
+
+  <h3>7 月（巴威正面过境）：大概率避免不了，能做的只有削峰</h3>
+  <ul>
+    <li>巴威对流域是暴雨台风（坝前 206mm / 2 天）。富春江电站是<strong>日调节径流电站</strong>，
+      库容拦不住区间+兰江的暴雨径流——水必须过坝，坝下 24h 均值 10.78 的大部分是被动过流，
+      "封顶 9.31 就不淹"在物理上不成立；</li>
+    <li>新安江（真正的蓄洪库）已尽拦蓄之责：入库仅抬升 1m，下游的 7 月洪峰主要不是它放的；</li>
+    <li>调度员手里只剩两件小工具：<strong>日内避潮错峰</strong>（7/12 泄洪峰距闸口潮峰仅 3h，
+      挪到落潮段可削下游峰一截）和<strong>提前预泄的量</strong>（7/11 坝前仅降 0.26m，预泄幅度
+      其实不大）。结论：7 月淹没以天灾为主，人为可消除的成分有限。</li>
+  </ul>
+
+  <h3>8 月（白海豚外围）：水库无解，只能减压</h3>
+  <p>肇事者是渌渚江支流雨带（肖岭 8/9 单日 190mm），干流只是背景水位（坝下 8.2 为兰江被动
+  过流），新安江全程未放水——无闸可关。可做的只有支流峰时段（8/10 07:00 前后）把富春江坝下
+  从 8.5 压到 ~7，渌渚峰约降 0.5m，把新桐乡从 7.24 压向红线附近；但库容只够错峰几小时。
+  8 月的"避免"不在水库手里：要么岛上工程防御，要么靠提前 39h 的预警组织撤离。</p>
+
+  <blockquote><p><strong>结论：两次淹没都是自然暴雨洪水，调度可消除的成分有限（避潮错峰、
+  支流峰时让路可削峰零点几米）——真正可靠的防线是提前预警与岛上防御，这正是本系统的价值所在。</strong></p></blockquote>
+</section>
+
+<!-- ============ 04 ============ -->
+<section id="s4">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 04</span></div>
+  <h2>预警规则、回测与阈值敏感性<span class="en">RULES · BACKTEST · SENSITIVITY</span></h2>
+
+  <div class="tbl-wrap"><table>
+    <caption>表 4-1 · 预警规则（级别 → 判据）</caption>
+    <thead><tr><th>级别</th><th>判据</th></tr></thead>
+    <tbody>
+      <tr><td>节气门控</td><td>主汛期 6/15–处暑(8/23) 全判据；处暑–白露(9/7) 涨幅/动量判据需渌渚≥6.5（滤潮汐涟漪，保真实脉冲）；白露后仅新桐乡实测现报级</td></tr>
+      <tr><td class="lv-amber">黄-泄洪</td><td>坝下24h均值≥7.0 且 渌渚6h涨≥0.3</td></tr>
+      <tr><td class="lv-amber">黄-支流</td><td>渌渚6h涨≥0.8 / 渌渚镇涨≥0.5 / 山溪涨≥0.6</td></tr>
+      <tr><td class="lv-red">红-动量</td><td>渌渚+6h涨幅 ≥7.3（峰值外推）</td></tr>
+      <tr><td class="lv-red">红-支流动量</td><td>渌渚镇+6h涨幅 ≥8.3（峰值外推）</td></tr>
+      <tr><td class="lv-red">红-泄洪级</td><td>坝下24h均值≥8.6 或 瞬时≥10.0</td></tr>
+      <tr><td>顶托</td><td>闸口≥6.0 时黄升红</td></tr>
+      <tr><td>现报级</td><td>新桐乡≥6.5/7.0（任何节气生效）；已过淹没阈值则保持不降级</td></tr>
+      <tr><td>复淹警戒</td><td>近 48h 曾过淹且近 6h 新桐乡 ≥5.5 → 退水期半日潮反复越阈，<strong>暂勿回岛低洼处</strong>（任何节气生效）</td></tr>
+      <tr><td>退水确认</td><td>新桐乡持续 6h &lt; 5.5 → 12h 内复淹概率 &lt;11%（实测 89% 安全），<strong>可回岛查看</strong></td></tr>
+    </tbody>
+  </table></div>
+
+  <p><strong>居民视角</strong>：首黄不是关键指标——连日下雨、水位上涨居民自己有感。系统真正要
+  回答的是"什么时候必须撤、什么时候能回来"：红灯/现报级=撤离信号；退水期即使涨幅判据安静，
+  半日潮仍会把水位反复顶过 6.5（2026 年 6 次过淹中 4 次是复淹，此前进水时刻模型还是绿灯——
+  复淹警戒就是补这个洞）；持续降到 5.5 以下才是可回岛信号。</p>
+
+  <h3>回测结果（6/25–8/31，1632h）</h3>
+  <p>4 次过阈事件全中，<strong>6 次过淹时刻（含 4 次退水期复淹）全部亮灯</strong>。首黄提前
+  19h/48h/39h/48h，首红提前 11h/48h/9h/48h。误报口径说明：黄以上 333h 中"报警后 24h 无过阈"
+  150h，其中约 133h 属退水期复淹警戒带（该带按"12h 内真复淹"口径命中 49%，作用是整个退水期
+  禁止回低洼处，属保守设计）；剔除警戒带后的常规误报与此前口径一致（红误报 35h）。</p>
+
+  <p>渌渚镇黄阈值 0.5 与红-支流动量 8.3 是针对 8/9 型"浅而久"支流事件的改进：支流对台风外围
+  雨带响应是缓涨型，微幅异常比暴涨早 1–2 天可见（8/9 事件首黄 15h → 39h，首红 5h → 9h），
+  代价是黄误报 +10h、红误报 +12h。</p>
+
+  <h3>阈值敏感性与代价不对称（issue 讨论后补）</h3>
+  <ul>
+    <li>敏感性扫描（渌渚镇 0.3–1.2）：0.3–0.5 为平台（三事件提前量 19/39/48h 不变，误报
+      170→150h）；<strong>0.5→0.6 是断崖</strong>（8 月提前量 39h→15h，误报仅 −1h）——0.5 选在
+      平台右缘，若未来事件支流信号更弱会退回 15h 提前量（仍过 ≥6h 自检线），失配后果有界；</li>
+    <li>其余关键阈值同口径扫描（各档先恢复全量原值，各事件首黄/首红提前量 + 误报）：
+      <strong>全部落在平台区，无断崖</strong>——
+      <ul>
+        <li>渌渚黄 0.8：0.6–1.2 提前量完全不变（19/39/48h），误报 196→143h 单调降；
+          0.4 可给 7 月 +21h 提前量但误报 +121h，不取；</li>
+        <li>坝下红 8.6：7.8–9.4 全程不影响任何事件首红（首红均由动量/支流动量/现报更早给出，
+          泄洪级从不是首红判据），只影响红误报 54→22h；</li>
+        <li>渌渚镇动量红 8.3：7.9–8.7 为缓坡（8 月首红 10→8h），误报 33→27h；</li>
+        <li>顶托 6.0：5.4–6.6 提前量全程不变，只影响红误报 69→23h；</li>
+      </ul>
+      结论：唯一的尖峰阈值是渌渚镇 0.5，其余阈值的稳健性充分；</li>
+    <li>代价敏感口径（漏报权重 5×误报）：现行 = 5×0 漏报事件 + 150h 黄误报（含复淹警戒带）
+      = 150。注意纯误报最小化会把阈值推向 0.6+（142h）——恰是提前量塌陷方向，<strong>该指标
+      必须与提前量并排使用，不能单独指导阈值</strong>。防汛场景下漏报一事件的代价远大于误报
+      一小时，这是保留低阈值的根本理由；</li>
+    <li>曾评估"xt≥6.5 持续 6h 升红"规则并否决：2026 三事件在该规则触发前早已红（零增益），
+      而 2025 年持续 30h 却未淹——持续时间在两层淹没模型下不是判别子，区分变量是台风复合因子；</li>
+    <li>三因子联合（台风≤500km + 近 1 日雨≥80mm + 渌渚镇涨≥0.5）实测首触均晚于现有红警
+      （日雨量粒度滞后），不做预警等级，降级为<strong>机制确认信号</strong>：三因子齐=复合进水型
+      （自动排除 2024 无台风/2025 弱复合型），风险卡显示"复合进水型"标识，向居民解释
+      "为什么 7.2m 就要撤"。</li>
+  </ul>
+</section>
+
+<!-- ============ 05 ============ -->
+<section id="s5">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 05</span></div>
+  <h2>雨量为何不进判据<span class="en">WHY RAINFALL IS DISPLAY-ONLY</span></h2>
+  <p class="muted">实测过，负收益。</p>
+
+  <p>用 2026 全汛期日雨量（两站均值）对"雨量进规则"做了两种检验：</p>
+  <ul>
+    <li><strong>当先导判据</strong>（近两日雨量≥50mm 报警）：不如水位——雨量是日粒度且日终才
+      结算，先导提前量 7 月 13h / 8 月仅 2h，均晚于现行水位首黄（19h / 39h）。支流微涨比
+      暴雨峰值早见，水位是"正在发生"的信号，雨量是"刚过去"的信号；</li>
+    <li><strong>当误报过滤门</strong>（涨幅类黄警需近两日雨量≥20mm）：黄误报 59h 中 54% 确实
+      发生在无雨期，门可砍掉约一半误报——但代价是 8 月型首黄 39h → 15h、7 月 19h → 11h，
+      用提前量换误报削减净收益为负。</li>
+  </ul>
+  <p>最终定位：雨量用于展示与事件归因（"为什么淹"），水位用于预警（"提前喊"）。无雨误报
+  场景（非汛期潮汐涟漪）已由节气门控覆盖。</p>
+</section>
+
+<!-- ============ 06 ============ -->
+<section id="s6">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 06</span></div>
+  <h2>岛内淹没社会观测标定库<span class="en">GROUND TRUTH · ISSUE #1</span></h2>
+
+  <div class="tbl-wrap"><table>
+    <caption>表 6-1 · 四场事件的社会观测真值</caption>
+    <thead><tr><th>事件</th><th>干流侧量级</th><th>岛内结局</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td>2024-06-25–26 梅雨（兰江主导）</td><td>富阳站峰 9.62m（超保证 0.62m，1997 年来最高）</td><td><strong>全岛撤离</strong></td><td><strong>无台风</strong>（当年前两个台风 5 月底前已消亡，纯梅雨漫溢）；官方简报时序验证</td></tr>
+      <tr><td>2025-06-15–17 梅雨（坝下 11.86m 特大）</td><td>新桐乡清洗后峰 8.07m，≥7.0 持续 30h</td><td><strong>居民称未淹</strong></td><td>台风"蝴蝶"残涡同期 618km 外（梅雨-台风相遇），复合因子弱一档（雨 100mm/支流 8.71m）</td></tr>
+      <tr><td>2026-07-13 台风暴雨</td><td>新桐乡峰 7.61m，≥7.0 持续 20.7h</td><td class="lv-red">淹（淹过小木屋地板）</td><td>实景照片见下</td></tr>
+      <tr><td>2026-08-09–11 台风外围支流</td><td>新桐乡峰 7.24m，≥7.0 持续 11h</td><td class="lv-red">淹（水位淹到小木屋）</td><td>实景照片见下</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>基地淹没实景照片（影像真值）</h3>
+
+  <figure class="photos">
+    <div class="ph-grid">
+      <figure>
+        <span class="ph-tag flood">7/13 淹没</span>
+        <img src="assets/20260713.jpg" alt="7/13 台风暴雨淹没实景一" loading="lazy">
+        <figcaption>2026-07-13 台风暴雨（新桐乡 7.61m）——水位淹过小木屋地板 · 之一</figcaption>
+      </figure>
+      <figure>
+        <span class="ph-tag flood">7/13 淹没</span>
+        <img src="assets/20260713-2.jpg" alt="7/13 台风暴雨淹没实景二" loading="lazy">
+        <figcaption>2026-07-13 台风暴雨（新桐乡 7.61m）——水位淹过小木屋地板 · 之二<br>
+        <span class="muted">（另有一张同场景照片存于 assets/，编号 20260713-1）</span></figcaption>
+      </figure>
+      <figure>
+        <span class="ph-tag flood">8/10 淹没</span>
+        <img src="assets/20260810.jpg" alt="8/10 台风天淹没实景" loading="lazy">
+        <figcaption>2026-08-10 台风天（拍摄于 08:00–08:20）——水位淹到小木屋</figcaption>
+      </figure>
+      <figure>
+        <span class="ph-tag normal">9/12 正常</span>
+        <img src="assets/20260912.jpg" alt="9/12 正常水位对照" loading="lazy">
+        <figcaption>2026-09-12 正常水位（拍摄于 08:49）——同机位对照</figcaption>
+      </figure>
+    </div>
+  </figure>
+
+  <div class="chain">
+    <span class="step">8/10 淹没照片</span><span class="arr">→</span>
+    <span class="step">7/13 淹没深度观察</span><span class="arr">→</span>
+    <span class="step">9/12 正常水位对照</span><span class="arr">⇒</span>
+    <span class="step final">三重独立验证闭环</span>
+  </div>
+
+  <h3>照片定标</h3>
+  <p>8/10 照片拍摄时刻（08:10 前后）站网读数为新桐乡 <strong>7.04–7.07m</strong>、渌渚镇
+  8.96–8.99m（支流峰）、闸口 6.42（落潮）——<strong>复合进水型的实测淹没线 = 站网 ≈7.05m
+  （岛上局部 ≈4.9m）</strong>，与红警线 7.0m 几乎精确重合：<strong>红警即淹没线</strong>，
+  "红警即撤"经影像定标。</p>
+  <p>9/12 照片定标：拍摄时刻站网 ≈5.15m（当日晨峰 07:00 为 5.52m）——距淹没线 7.05m 差
+  <strong>−1.9m（晨峰口径 −1.53m）</strong>，与现场目测"距被淹约 −1.5m"吻合。</p>
+
+  <h3>7/13 现场时刻交叉验证（居民观察）</h3>
+  <ul>
+    <li><strong>07:35–08:00 基地全部淹没、水超小木屋地板 30–50cm</strong>：该时段站网
+      7.36–7.46，高出 8/10 定标的基地地面线 <strong>+0.31–0.39m</strong>（加上地板本身高度，
+      落在 30–50cm 区间正中）——两个独立事件的现场观察互洽 ✓；</li>
+    <li><strong>14:30 地盘水全部退去</strong>：当时站网仅 <strong>6.62m</strong>——比进水线低
+      0.43m。<strong>进水线 ≠ 退水线（迟滞环 0.43m）</strong>：进水发生在支流峰+高潮顶托时
+      （水被顶进来），退水时支流（渌渚镇已退至 7.41）与潮位（闸口 6.12 落潮）同步回落，
+      岛内积水在更低的干流水位下排干。启示：现行退水确认（xt 持续&lt;5.5）偏保守，
+      "xt≈6.6 且支流&lt;7.5 且落潮"可能是地盘排干的更早判据——样本 n=1，暂不改规则，明年验证。</li>
+  </ul>
+</section>
+
+<!-- ============ 07 ============ -->
+<section id="s7">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 07</span></div>
+  <h2>两层淹没线模型<span class="en">TWO-LAYER FLOOD LINE MODEL</span></h2>
+  <p class="muted">"6–7m 基地被淹"经确认为实测仪读数口径，站网 = 实测 + 2.13m。</p>
+
+  <div class="tbl-wrap"><table>
+    <caption>表 7-1 · 两层淹没线（核心不自洽已解）</caption>
+    <thead><tr><th>淹没模式</th><th>实测仪口径</th><th>站网口径</th><th>实例</th></tr></thead>
+    <tbody>
+      <tr><td>干流漫溢（江水漫过基地地面）</td><td>6–7m</td><td><strong>8.1–9.2m</strong></td><td>2024 全岛撤离；2025 年 8.07m（实测 5.94m）擦线未淹</td></tr>
+      <tr><td>台风复合进水（暴雨内涝+支流回灌+风壅，干流未漫溢也进水）</td><td>4.4–4.9m</td><td><strong>6.5–7.0m（现报线）</strong></td><td>2026 两次（实测仅 5.5/5.1m 却淹）</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>四事件全部自洽。<strong>现报线 6.5/7.0 保留</strong>——它是台风复合型的正确撤离线，对干流型
+  偏早属"宁撤勿漏"；干流型硬底线在站网 8m 档（富阳站 2024 年 9.62m 为实证）。复合判据的
+  定标（风+雨+潮相位）待岛上水位仪积累一次汛期真值。</p>
+
+  <h3>为什么 2025 年水位更高却没淹（同一栋房子、两个进水口）</h3>
+  <ol>
+    <li><strong>干流漫溢型（2024/2025）</strong>：基地地面很高，干流水要爬上它需站网 8.1–9.2m。
+      2025 年 8.07m <strong>差一线</strong>（0.1–1m），水在基地脚下没上来——居民看到"水很高但
+      没进基地"是完全真实的体感；2024 年 9.62m 爬上来了，全岛撤离；</li>
+    <li><strong>台风复合进水型（2026×2）</strong>：水面（实测 5.5/5.1m）离基地地面还差 1m 多，
+      但水从"侧门"进屋——当地暴雨内涝（206/242mm，是 2025 年两倍多）+ 渌渚江支流回灌
+      （8/9 渌渚镇 8.99m，三次事件最高，干流站看不见这个水）+ 台风风壅。
+      注：2025 年 6/14–15 的"梅雨"实为<strong>梅雨-台风相遇</strong>（2025 年 1 号台风"蝴蝶"残涡
+      同期距岛 618km，可能参与水汽输送），但其三因子全面弱一档（台风距离 618 vs 205km、
+      雨量 100 vs 242mm、支流峰 8.71 vs 8.99m）——复合强度不足，基地幸免。这支持"复合进水
+      需要台风/暴雨/支流三因子强度"的判据方向，且与预备级阈值（500km）自洽；</li>
+    <li>模型锚定的新桐乡站在干流对岸：对漫溢型准确（诚实反映 2025 年"差一线"），但复合进水型
+      决定淹不淹的水不在它的河道里——这就是"单一水位线不自洽"的本质。</li>
+  </ol>
+</section>
+
+<!-- ============ 08 ============ -->
+<section id="s8">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 08</span></div>
+  <h2>实地水位校正（2026 春季实测）<span class="en">FIELD CALIBRATION</span></h2>
+
+  <p>岛上实地布设的自记水位仪（压力式，5min 粒度，2026-03-14–04-24 共 987h，
+  <code>data/field_island_2026spring.csv</code>）与同期三站对齐：</p>
+
+  <div class="tbl-wrap"><table>
+    <caption>表 8-1 · 站水位 − 岛上实测水深（基面差）</caption>
+    <thead><tr><th>相邻站</th><th>站水位 − 实测水深</th><th>稳定性</th></tr></thead>
+    <tbody>
+      <tr><td><strong>新桐乡</strong></td><td><strong>+2.13m</strong></td><td>σ=0.06m，r=0.995，分水位段 2.06–2.16（与水位无关的纯基面差）</td></tr>
+      <tr><td>渌渚</td><td>+2.12m</td><td>σ=0.08</td></tr>
+      <tr><td>窄溪</td><td>+2.18m</td><td>σ=0.07</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><strong>新桐乡站读数 = 岛上局部水深 + 2.13m</strong>。据此，淹没阈值 6.5/7.0m（站网口径）=
+  岛上局部水深 4.4/4.9m——阈值由"事件经验校准"升级为"实地物理锚定"。居民经验
+  "实测 6–7m 基地被淹"与此吻合。</p>
+</section>
+
+<!-- ============ 09 ============ -->
+<section id="s9">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 09</span></div>
+  <h2>2025-06-15 梅雨洪水验证<span class="en">OUT-OF-SAMPLE · THREE REVISIONS</span></h2>
+
+  <p>结论经历两次修正，记录完整过程以保留方法论教训：</p>
+  <ol>
+    <li><strong>初版</strong>（收割重放）：命中，新桐乡峰 8.28m；</li>
+    <li><strong>撤回版</strong>（官方简报+居民+雨量交叉验证）：判接口数据整体不可信，全部撤回；</li>
+    <li><strong>最终版</strong>（<code>verification/</code>，fuchunjiang-hydro 独立管道直拉复验 +
+      实地校正）：
+      <ul>
+        <li><strong>坝下逐时中位 11.80m / 渌渚 8.53m 真实</strong>（独立管道精确复现，"量级虚高"
+          判定过严）——2025-06-15–17 上游确为超过 2026 年所有事件的特大洪水；</li>
+        <li><strong>新桐乡 8.28m 为 6/17 毛刺小时中位</strong>（瞬时尖峰 17.86m，与窄溪 8.31m
+          不符水力学）；6/15 真实峰值 <strong>7.27m</strong>（23:45），22:00 短暂过红线 7.12m；</li>
+        <li>预警算法重放：6/15 08:00 红级（动量）领先红线触碰 <strong>14h</strong>，无漏报；</li>
+        <li>居民"桥下基地未淹"成立——峰值擦线且短暂（见 §7 校正分析），不矛盾；</li>
+        <li>官方简报"零站超警"为日/8 时报汛口径，与瞬时极值可并存（新桐乡站警戒约 8.0m 亦未到）。</li>
+      </ul>
+    </li>
+  </ol>
+  <p><strong>有效样本外验证恢复为</strong>：2025-06-15 重放（首红提前 14h）+ 2024 官方简报时序
+  验证。保留的方法论教训：<strong>单管道回溯数据不可直接采信，须独立管道 + 官方口径 + 实地
+  证据三方交叉</strong>——本次三版演进正是这套流程的演练。</p>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="s10">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 10</span></div>
+  <h2>已发现并修复的缺陷<span class="en">DEFECTS FOUND &amp; FIXED</span></h2>
+
+  <h3>代码缺陷</h3>
+  <div class="tbl-wrap"><table>
+    <caption>表 10-1 · 代码缺陷 → 根因 → 修复</caption>
+    <thead><tr><th>缺陷</th><th>根因</th><th>修复</th></tr></thead>
+    <tbody>
+      <tr><td>报警期 30 分钟加密拉取实际不生效</td><td><code>_stale()</code> 过期线固定 1 小时：报警时 30 分钟醒来、缓存未"过期"又睡回去，实际仍 ~1 小时一拉</td><td>黄/红时过期线降为 30 分钟</td></tr>
+      <tr><td>上游渌渚站缺失会弄瞎撤离判据</td><td>新桐乡故障清洗规则"与渌渚差&gt;2m 剔除"在渌渚整站缺失时把 xt 全部剔成 NaN，现报级失效——恰在最需要它的数据残缺时刻</td><td>渌渚未知时保留 xt（宁信实测），归档+实况两处</td></tr>
+      <tr><td>历史收割主站全部返回空</td><td>迭代站字典时误用键（站名 baxia/luzhu…）当站号发给接口，溪站恰好键为真站号所以"部分正常"，掩盖了错误</td><td>改用站号列表</td></tr>
+      <tr><td>断点续收崩溃</td><td>被中断的收割留下 0 字节 CSV，重跑时 <code>read_csv</code> 抛 EmptyDataError</td><td>空文件容错</td></tr>
+      <tr><td>收割全部空返回（间歇性）</td><td>多个收割进程并发超过接口 ≤3 次/分限频，服务端不报错、静默返回空</td><td>单进程运行 + 空结果重试</td></tr>
+      <tr><td><strong>2025 年回溯水位部分失真</strong></td><td>新桐乡 6/17 毛刺小时中位 8.28m 被当作真实峰值；"量级虚高"撤回又对坝下/渌渚误判（独立管道复验为真）</td><td>独立管道+官方口径+实地证据三方交叉后出最终版（见 §9）；毛刺靠上下游水力学对照剔除</td></tr>
+      <tr><td><strong>新桐乡传感器饱和钉死未清洗</strong>（issue#1）</td><td>超量程读数钉死 17.85/16.4–16.8 平顶 1–3h，且 ±2h 邻域出 13–15m 垃圾——淹没最深的时刻恰是传感器失效的时刻（7/12 前夜、8/9 淹没中）</td><td>归档+实况清洗加"≥16m 及 ±2h 邻域→水位未知"；回测四事件不受影响，真实峰 7.61/7.24 保留</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>规则缺陷（数据/验证暴露）</h3>
+  <div class="tbl-wrap"><table>
+    <caption>表 10-2 · 规则缺陷 → 暴露来源 → 修复</caption>
+    <thead><tr><th>缺陷</th><th>暴露来源</th><th>修复</th></tr></thead>
+    <tbody>
+      <tr><td>退水期复淹进水时模型是绿灯（4/6 次过淹）</td><td>以"过淹时点"而非"事件首报"重测</td><td>复淹警戒（近 48h 曾过淹且近 6h ≥5.5 → 保持黄警）+ 退水确认（持续 6h &lt;5.5 → 可回岛）</td></tr>
+      <tr><td>非汛期潮汐上溯使渌渚 6h ±1m 常规波动天天误亮黄（9 月实测 6h 涨 0.92 触发）</td><td>上线后 9 月实况</td><td>节气门控：处暑–白露涨幅判据需渌渚≥6.5，白露后仅留新桐乡实测</td></tr>
+      <tr><td>支流动量红（渌渚镇≥8.3）孤涨误撤（提示来自后判不可信的 2025 回溯数据）</td><td>"2025 重放"（该年数据已判不可信，见 §9）</td><td>红级加渌渚≥5.5 佐证门（干流低水位稀释支流峰，孤涨不淹岛——物理逻辑独立成立；2026 样本四事件命中不受影响）</td></tr>
+      <tr><td>山溪 6h 涨幅被当作"本地降雨代理"误导事件归因（7 月实际流域降雨 206mm）</td><td>流域雨量接入后</td><td>已修正归因；山溪站受基流/上游小库缓冲，仅作涨幅判据</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="s11">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 11</span></div>
+  <h2>2024 特大洪水历史参照<span class="en">2024-06-25 BENCHMARK</span></h2>
+
+  <p>水位接口只回溯到 2025 年中，但<strong>浙江省水文简报</strong>（<code>sqfb.slt.zj.gov.cn:30050</code>
+  水雨情平台可下载，2024 年 6/25–27 共 18 期已存档 <code>data/bulletin_2024/</code>）提供了
+  事件全过程的官方站点时序。岛上结果：6/26 凌晨超 9.0m 房屋积水、10:30 峰
+  <strong>9.61m（1997 年以来最高）</strong>。</p>
+
+  <div class="tbl-wrap"><table>
+    <caption>表 11-1 · 上游官方站点时序（简报超警表）</caption>
+    <thead><tr><th>时间</th><th>梅城（新安江尾）</th><th>三河（兰江）</th><th>桐庐（岛上游）</th><th>岛上（新闻）</th></tr></thead>
+    <tbody>
+      <tr><td>6/25 11时</td><td><strong>24.13 超警</strong></td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>6/25 16时</td><td>—</td><td>黄色预警发布</td><td>—</td><td>—</td></tr>
+      <tr><td>6/25 20时</td><td>24.62 超警</td><td>26.56 超警</td><td>11.53 刚超警</td><td>—</td></tr>
+      <tr><td>6/26 02时</td><td>25.44 <strong>超保</strong></td><td>27.50 <strong>超保</strong></td><td>11.93 超警</td><td>开始进水</td></tr>
+      <tr><td>6/26 07–11时</td><td>25.89 峰</td><td>28.04 峰</td><td><strong>12.48 峰（超保 0.18）</strong></td><td><strong>10:30 峰 9.61m</strong></td></tr>
+      <tr><td>全程</td><td colspan="4">富春江水库坝前 23.35–23.68 仅超汛限 0.35–0.68（被动过流）；分水江水库超汛限 6.91m（巨量拦洪）</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>对模型的验证与启示（2024 型为兰江主导的梅雨洪水）：</p>
+  <ol>
+    <li><strong>黄级链条成立</strong>：上游首警（梅城 6/25 11 时超警）领先岛峰 <strong>23.5h</strong>；
+      三河/桐庐超警（6/25 20 时）领先岛峰 14.5h、领先岛进水约 4–6h。模型的"上游涨→黄"设计
+      在此型事件有充分提前量；</li>
+    <li><strong>官方红级救不了岛（关键反证）</strong>：官方"保证水位"级红色信号 6/26 02 时才出现，
+      与岛凌晨进水几乎同时——<strong>等官方红警再撤已经晚了</strong>。这正是本模型把红级锚定
+      "新桐乡实测 6.5/7.0 + 动量外推"而非官方保证水位的原因，2024 事件反证了该设计；</li>
+    <li>局限：简报无坝下/渌渚/新桐乡逐时序列，泄洪型与动量判据无法数值重放，仅验证了上下游
+      时序逻辑与撤离窗口。</li>
+  </ol>
+</section>
+
+<!-- ============ 12 ============ -->
+<section id="s12">
+  <a class="back-top" href="#top">↑ 回目录</a>
+  <div class="sec-head"><span class="sec-no">§ 12</span></div>
+  <h2>边界与局限<span class="en">LIMITATIONS</span></h2>
+  <ul>
+    <li>规则阈值基于 2026 年 6–8 月 4 次过阈事件校准，样本少，其他年份/量级的事件可能误报或漏报；</li>
+    <li>节气用公历近似日期（每年 ±1 天）。白露关停已用雨量站 2023–2026 四年数据验证：白露后
+      最大日雨量 53mm（2022 秋台风梅花），仅为淹没量级（190–242mm/过程）的 1/4–1/8；极端尾部
+      （如 2013 年 10 月台风菲特型，接口无该年数据）由全年生效的新桐乡实测现报级兜底；</li>
+    <li>台风只做预备级提示，不参与水位风险等级判定（无历史预报样本可校准升级规则）；</li>
+    <li>依赖公开接口，<code>--check</code> 有限频（约 2 分钟），台风接口异常时自动降级为无台风段；</li>
+    <li>传感器偶发故障读数靠物理校验剔除（下游高于上游），不能覆盖所有故障模式。</li>
+  </ul>
+</section>
+
+<footer class="colophon">
+  <div>
+    桐洲岛洪水研究报告 · 2026 汛期<br>
+    数据：浙江省水利厅公开接口 · 岛上实地水位仪（987h）· 官方水文简报（2024，18 期）
+  </div>
+  <div style="text-align:right">
+    配套系统：本仓库（flood_warning.py / dashboard.py / typhoon.py）<br>
+    照片真值存于 <code>assets/</code> · 本地打开以查看图片
+  </div>
+</footer>
+
+</div>
+</body>
+</html>
