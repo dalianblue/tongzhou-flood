@@ -89,8 +89,13 @@ def load_archive_hours(start=None, end=None, path=None) -> pd.DataFrame:
         w = w.loc[start or w.index[0]: end or w.index[-1]]
     for c in w.columns:
         w[c] = clean(w[c])
-    # 新桐乡非物理值: 坝下全年峰11.5m, 下游不可能>12m; 再校验与上游渌渚一致性(差>2m 剔除)
-    # (8/9 洪水期传感器故障出 10~18m 读数, 上下游对照可全部剔除)
+    # 新桐乡传感器饱和钉死检测 (issue#1): 超量程时读数钉死 17.85/16.4~16.8 平顶 1~3h,
+    # 且邻域爬坡段出 13~15m 垃圾值 — 剔 ≥16m 及其 ±2h 邻域, 该时段标"水位未知"
+    if "xt" in w:
+        sat = (w["xt"] >= 16)
+        if sat.any():
+            win = sat.rolling(49, center=True, min_periods=1).max() > 0  # 5min×±2h
+            w["xt"] = w["xt"].where(~win)
     w["xt"] = w["xt"].where(w["xt"] < 12)
     lz_ff = w["luzhu"].reindex(w.index, method="ffill", tolerance=pd.Timedelta("1h"))
     # 渌渚未知时保留 xt (不能因上游站缺失而弄瞎现报级判据)
@@ -382,7 +387,14 @@ def live_snapshot(hours: float = 72.0) -> dict:
     h = df.resample("h").median()
     if "lzz" not in h:
         h["lzz"] = np.nan
-    # 新桐乡非物理值剔除 (同归档清洗): 与上游渌渚差>2m 置NaN; 渌渚未知时保留
+    # 新桐乡非物理值剔除 (同归档清洗): 饱和钉死(≥16m及±2h邻域)→未知; <12上限;
+    # 与上游渌渚差>2m 剔除, 渌渚未知时保留
+    if "xt" in h:
+        sat = (h["xt"] >= 16)
+        if sat.any():
+            win = sat.rolling(5, center=True, min_periods=1).max() > 0  # 逐时×±2h
+            h["xt"] = h["xt"].where(~win)
+        h["xt"] = h["xt"].where(h["xt"] < 12)
     if "xt" in h and "luzhu" in h:
         lz_ff = h["luzhu"].reindex(h.index, method="ffill", tolerance=pd.Timedelta("1h"))
         h["xt"] = h["xt"].where(lz_ff.isna() | ((h["xt"] - lz_ff).abs() <= 2.0))
