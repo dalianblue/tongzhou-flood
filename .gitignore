@@ -1,4 +1,4 @@
 __pycache__/
 data/live_cache.json
-__pycache__/
+data/weather_config.json
 .DS_Store
