@@ -77,6 +77,16 @@ def _fetch_once():
             out["rain"] = FW.fetch_rain()
         except Exception:
             out["rain"] = []
+        # 三因子机制确认 (issue讨论): 台风≤500km + 昨日雨≥80mm + 渌渚镇涨≥0.5 同时满足
+        # = 复合进水型(2026两淹均满足, 2024无台风/2025弱复合型均不满足) — 解释"为何低水位也撤"
+        try:
+            near = min([t["cur_km"] for t in ty.get("typhoons", []) if "cur_km" in t], default=None)
+            rain_y = max([r["drp"] for r in out["rain"] if r["date"] < out["fetched_at"][:10]], default=0)
+            out["compound"] = bool(near is not None and near <= 500 and rain_y >= 80
+                                   and out["stations"]["lzz_r6"] is not None
+                                   and out["stations"]["lzz_r6"] >= 0.5)
+        except Exception:
+            out["compound"] = False
         CACHE.parent.mkdir(exist_ok=True)
         CACHE.write_text(json.dumps(out, ensure_ascii=False))
         _state["fetched_at"], _state["error"] = out["fetched_at"], None
@@ -280,6 +290,10 @@ async function loadLatest(){
       `${t.name}(${t.num}) ${t.grade} 距岛${t.cur_km}km${t.fc_min_km!=null?` · 72h预报最近${t.fc_min_km}km`:''}`).join('；')
       + (d.typhoon.prealert?' — <b>预备级: 台风将影响, 预期水库预泄+支流涨水, 提前巡查</b>':'');
   } else ty.className='tyline';
+  if(d.compound){
+    ty.className = 'tyline ty-on';
+    ty.innerHTML += '<div style="margin-top:6px"><b style="color:#e05252">◉ 复合进水型确认</b>（台风≤500km + 近1日雨≥80mm + 渌渚镇涨幅≥0.5 三因子齐）— 暴雨内涝+支流回灌+风壅叠加, 低水位也会进水, 红警即撤勿疑</div>';
+  }
   const rl = document.getElementById('rainline');
   rl.textContent = (d.rain && d.rain.length) ? '流域近3日雨量: '
     + [...new Set(d.rain.map(x=>x.station))].map(s=>s+' '
