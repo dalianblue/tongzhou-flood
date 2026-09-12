@@ -471,7 +471,19 @@ def main():
     c = _load_cache()
     _state["fetched_at"] = c["fetched_at"] if c else None
     threading.Thread(target=_bg_loop, daemon=True).start()
-    srv = ThreadingHTTPServer(("0.0.0.0", a.port), Handler)
+    try:
+        srv = ThreadingHTTPServer(("0.0.0.0", a.port), Handler)
+    except OSError as e:
+        if e.errno == 48:  # 端口被旧实例占用
+            import subprocess
+            pids = subprocess.run(["lsof", "-tP", f"-iTCP:{a.port}", "-sTCP:LISTEN"],
+                                  capture_output=True, text=True).stdout.split()
+            print(f"端口 {a.port} 已被占用 (PID {','.join(pids) or '?'} — 多半是旧实例仍在运行)。\n"
+                  f"  旧实例还在提供旧版页面, 建议先停掉再启动:\n"
+                  f"    kill {' '.join(pids) if pids else '<PID>'}\n"
+                  f"  或换端口启动: python3 dashboard.py --port {a.port + 1}")
+            sys.exit(1)
+        raise
     import webbrowser
     webbrowser.open(f"http://localhost:{a.port}")  # 启动即打开浏览器
     print(f"Dashboard → http://localhost:{a.port}  (每小时自动拉取实况, Ctrl+C 退出)")
