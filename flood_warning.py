@@ -339,7 +339,7 @@ def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90,
 
 
 RAIN_STATIONS = [("70101500", "富春江电站"), ("70115580", "肖岭水库")]  # 距岛最近且有雨量的站(桐庐)
-WEATHER_DIR = Path.home() / "weather" / "data"      # 自建气象站(杭州, 10min粒度): 风/雨为复合进水型提供本地因子
+WEATHER_DIR = Path.home() / "weather" / "data"      # 自建气象站(距岛50km 北偏东20°, 10min粒度): 风/雨为复合进水型提供因子
 TH_GUST = 9.5   # 复合因子-风: 阵风m/s阈值 (实测四事件二分: 2024纯漫溢5.0/2025弱复合8.6 vs 2026两次11.2/12.6; 全季P99=7.5)
 
 
