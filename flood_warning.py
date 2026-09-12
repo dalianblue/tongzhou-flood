@@ -117,6 +117,7 @@ def signals(h: pd.DataFrame) -> pd.DataFrame:
         "xi_r6": pd.concat([h[c] - h[c].shift(6) for c in xi_cols], axis=1).max(axis=1)
                  if xi_cols else np.nan,
         "zk": h["zk"],
+        "zk_r1": h["zk"] - h["zk"].shift(1),  # 潮位1h趋势: >0涨潮中(复淹警戒提示用, 替代不可直连的潮汐表API)
         "xt": h["xt"] if "xt" in h else np.nan,
         "xt_max48": (h["xt"].rolling(48, min_periods=1).max().shift(1)
                      if "xt" in h else np.nan),  # 近48h是否曾过淹(复淹警戒用)
@@ -163,7 +164,9 @@ def assess(sig: pd.Series) -> dict:
     if not np.isnan(xt48) and xt48 >= TH_FLOOD_Y:
         if not np.isnan(xt6) and xt6 >= TH_RECESS_SAFE and not yellow and not red:
             yellow = True
-            reasons.append(f"复淹警戒: 近48h曾过淹(峰{xt48:.2f}), 水位仍在{TH_RECESS_SAFE}~{TH_FLOOD_Y}带, "
+            zk1 = getattr(sig, "zk_r1", np.nan)
+            tide = "" if np.isnan(zk1) else ("，闸口涨潮中⚠" if zk1 > 0.05 else "，落潮中")
+            reasons.append(f"复淹警戒: 近48h曾过淹(峰{xt48:.2f}), 水位仍在{TH_RECESS_SAFE}~{TH_FLOOD_Y}带{tide}, "
                            "涨潮时段可能再越阈 — 暂勿回岛低洼处")
         elif not np.isnan(xt6) and xt6 < TH_RECESS_SAFE:
             reasons.append(f"退水确认: 新桐乡持续6h<{TH_RECESS_SAFE}, 12h内复淹概率<11% — 可回岛查看")
@@ -336,6 +339,31 @@ def _fetch_window(zm: str, jg: int, hours: float, timeout: int = 90,
 
 
 RAIN_STATIONS = [("70101500", "富春江电站"), ("70115580", "肖岭水库")]  # 距岛最近且有雨量的站(桐庐)
+WEATHER_DIR = Path.home() / "weather" / "data"      # 自建气象站(杭州, 10min粒度): 风/雨为复合进水型提供本地因子
+TH_GUST = 9.5   # 复合因子-风: 阵风m/s阈值 (实测四事件二分: 2024纯漫溢5.0/2025弱复合8.6 vs 2026两次11.2/12.6; 全季P99=7.5)
+
+
+def read_weather(hours: float = 24.0) -> dict:
+    """自建气象站近N小时 → {asof, gust, wind, rain24, stale}.
+    站不在流域(雨量偏小, 仅作因子参考), 但风信号即台风风壅的本地实测."""
+    import glob as _glob
+    files = sorted(_glob.glob(str(WEATHER_DIR / "*.CSV")))[-2:]
+    if not files:
+        return {"error": "无气象站数据文件"}
+    w = pd.concat([pd.read_csv(f) for f in files])
+    w["Time"] = pd.to_datetime(w.Time)
+    for c in ["Wind(m/s)", "Gust(m/s)", "Hourly Rain(mm)"]:
+        w[c] = pd.to_numeric(w[c], errors="coerce")
+    w = w.set_index("Time").sort_index().tail(int(hours * 6 + 12))
+    now = pd.Timestamp.now()
+    return {
+        "asof": w.index.max().strftime("%Y-%m-%d %H:%M"),
+        "age_h": round((now - w.index.max()).total_seconds() / 3600, 1),
+        "gust": round(w["Gust(m/s)"].max(), 1),
+        "wind": round(w["Wind(m/s)"].max(), 1),
+        "rain24": round(w["Hourly Rain(mm)"].sum(), 1),
+        "stale": bool((now - w.index.max()).total_seconds() > 3 * 3600),
+    }
 
 
 def fetch_rain(days: int = 3) -> list:
@@ -443,6 +471,15 @@ def cmd_check():
                 print(f"  {st}: " + " | ".join(days))
     except Exception as e:
         print(f"\n流域雨量: 拉取失败({repr(e)[:40]}), 跳过")
+    # 本地气象站 (复合因子: 风壅实测)
+    try:
+        wx = read_weather()
+        if "error" not in wx:
+            stale = f" ⚠停更{wx['age_h']}h" if wx["stale"] else ""
+            print(f"本地气象站: 阵风 {wx['gust']}m/s({'≥' if wx['gust'] >= TH_GUST else '<'}{TH_GUST}"
+                  f"复合线) | 近24h雨 {wx['rain24']}mm | 数据 {wx['asof']}{stale}")
+    except Exception as e:
+        print(f"本地气象站: 读取失败({repr(e)[:40]})")
     # 台风因素 (预备级, 独立于水位等级): 72h预报路径距岛≤500km → 水库大概率预泄
     try:
         import typhoon as TYPH

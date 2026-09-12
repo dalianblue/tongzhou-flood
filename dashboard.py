@@ -77,16 +77,22 @@ def _fetch_once():
             out["rain"] = FW.fetch_rain()
         except Exception:
             out["rain"] = []
-        # 三因子机制确认 (issue讨论): 台风≤500km + 昨日雨≥80mm + 渌渚镇涨≥0.5 同时满足
-        # = 复合进水型(2026两淹均满足, 2024无台风/2025弱复合型均不满足) — 解释"为何低水位也撤"
+        # 复合进水型四因子计分: 支流涨≥0.5 / 本地阵风≥9.5 / 雨(流域昨日≥80 或 站24h≥50) / 台风≤500km
+        # 实测标定: 2026两淹 3~4/4, 2024纯漫溢 1/4, 2025弱复合 2/4 → ≥3 确认复合进水型
         try:
             near = min([t["cur_km"] for t in ty.get("typhoons", []) if "cur_km" in t], default=None)
             rain_y = max([r["drp"] for r in out["rain"] if r["date"] < out["fetched_at"][:10]], default=0)
-            out["compound"] = bool(near is not None and near <= 500 and rain_y >= 80
-                                   and out["stations"]["lzz_r6"] is not None
-                                   and out["stations"]["lzz_r6"] >= 0.5)
+            wx = FW.read_weather()
+            lzz_ok = out["stations"]["lzz_r6"] is not None and out["stations"]["lzz_r6"] >= 0.5
+            f = {"支流": lzz_ok,
+                 "风": (not wx.get("stale")) and wx.get("gust", 0) >= FW.TH_GUST,
+                 "雨": rain_y >= 80 or (not wx.get("stale")) and wx.get("rain24", 0) >= 50,
+                 "台风": near is not None and near <= 500}
+            out["compound"] = sum(f.values()) >= 3
+            out["factors"] = {k: "✓" if v else "✗" for k, v in f.items()}
+            out["weather"] = {k: wx.get(k) for k in ("asof", "age_h", "gust", "rain24", "stale")}
         except Exception:
-            out["compound"] = False
+            out["compound"], out["factors"], out["weather"] = False, {}, {}
         CACHE.parent.mkdir(exist_ok=True)
         CACHE.write_text(json.dumps(out, ensure_ascii=False))
         _state["fetched_at"], _state["error"] = out["fetched_at"], None
@@ -296,7 +302,14 @@ async function loadLatest(){
   } else ty.className='tyline';
   if(d.compound){
     ty.className = 'tyline ty-on';
-    ty.innerHTML += '<div style="margin-top:6px"><b style="color:#e05252">◉ 复合进水型确认</b>（台风≤500km + 近1日雨≥80mm + 渌渚镇涨幅≥0.5 三因子齐）— 暴雨内涝+支流回灌+风壅叠加, 低水位也会进水, 红警即撤勿疑</div>';
+    ty.innerHTML += '<div style="margin-top:6px"><b style="color:#e05252">◉ 复合进水型确认</b>'
+      + '（因子: ' + Object.entries(d.factors||{}).map(([k,v])=>k+v).join(' ') + '）'
+      + '— 暴雨内涝+支流回灌+风壅叠加, 低水位也会进水, 红警即撤勿疑</div>';
+  }
+  const wl = (d.weather||{});
+  if(wl.asof){
+    document.getElementById('rainline').textContent += (wl.stale?' [气象站停更'+wl.age_h+'h!]':'')
+      + `  ·  本地站: 阵风${wl.gust}m/s(线${d.factors&&d.factors['风']?'✓':'✗'}) 近24h雨${wl.rain24}mm (${wl.asof})`;
   }
   const rl = document.getElementById('rainline');
   rl.textContent = (d.rain && d.rain.length) ? '流域近3日雨量: '
