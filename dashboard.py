@@ -472,6 +472,8 @@ def main():
     _state["fetched_at"] = c["fetched_at"] if c else None
     threading.Thread(target=_bg_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", a.port), Handler)
+    import webbrowser
+    webbrowser.open(f"http://localhost:{a.port}")  # 启动即打开浏览器
     print(f"Dashboard → http://localhost:{a.port}  (每小时自动拉取实况, Ctrl+C 退出)")
     try:
         srv.serve_forever()
